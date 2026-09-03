@@ -41,14 +41,29 @@ Either way the settings are:
 | publish directory | `dist` |
 | node version | 20 or newer |
 
-**GitHub Pages** needs one extra step, because Pages serves from a
-subdirectory. Set the base path first, or the CSS and JS will 404:
+### GitHub Pages
+
+Already wired: `.github/workflows/deploy.yml` builds and deploys on every push
+to `master`, and works out the base path from the repo name itself, so nothing
+needs editing if you rename the repo.
+
+Two things to know:
+
+- **A free GitHub account can only serve Pages from a public repo.** Private
+  repos need a paid plan.
+- After the first push, go to **Settings -> Pages** and set **Source** to
+  **GitHub Actions**. The workflow cannot do this for you. Your site then lands
+  at `https://<user>.github.io/<repo>/`.
+
+If you ever build for Pages by hand on Windows, Git Bash rewrites a leading
+slash into a Windows path and silently produces broken asset URLs
+(`/Program Files/Git/repo/assets/...`). Disable the conversion:
 
 ```bash
-npm run build -- --base=/YOUR-REPO-NAME/
+MSYS_NO_PATHCONV=1 npm run build -- --base=/YOUR-REPO-NAME/
 ```
 
-Then publish `dist/` to the `gh-pages` branch.
+The CI runner is Linux, so it is unaffected.
 
 ## What changes once it is on a real host
 

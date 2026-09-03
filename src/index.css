@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Anton", "Impact", "Haettenschweiler", sans-serif;
+  --font-sans: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  /* Netflix surfaces: true black page, lifted near-blacks for anything raised. */
+  --color-bg: #000000;
+  --color-bg-2: #141414;
+  --color-card: #181818;
+  --color-card-2: #232323;
+  --color-line: #2b2b2b;
+  --color-fg: #ffffff;
+  --color-muted: #b3b3b3;
+
+  /* The brand red is reserved for identity and calls to action, never for a
+     clue state — a red tile would read as "wrong". */
+  --color-brand: #e50914;
+  --color-brand-dark: #b20710;
+  --color-brand-glow: #ff2a35;
+
+  /* Clue states. Green is Netflix's own match-score green. */
+  --color-hit: #1d7a3e;
+  --color-hit-2: #46d369;
+  --color-near: #8a6b12;
+  --color-near-2: #e8b923;
+  --color-miss: #2a2a2a;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+.display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+  font-weight: 400;
+}
+
+/* The wordmark: tall, tight, blood red, with the faint glow Netflix's logo
+   picks up against black. */
+.wordmark {
+  font-family: var(--font-display);
+  color: var(--color-brand);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 18px rgba(229, 9, 20, 0.45);
+}
+
+/* Page-level vignette so content sits in a pool of light, like a billboard. */
+.vignette::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(120% 80% at 50% 0%, rgba(229, 9, 20, 0.10) 0%, transparent 55%);
+}
+
+/* ---------------------------------------------------------------- *
+ * Motion
+ * ---------------------------------------------------------------- */
+
+@keyframes flip-in {
+  0%   { transform: rotateX(-92deg); opacity: 0; }
+  55%  { transform: rotateX(12deg);  opacity: 1; }
+  100% { transform: rotateX(0deg);   opacity: 1; }
+}
+.tile-flip {
+  animation: flip-in 0.5s cubic-bezier(.2,.7,.3,1) both;
+  transform-origin: top center;
+  backface-visibility: hidden;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up .45s cubic-bezier(.2,.7,.3,1) both; }
+
+@keyframes pop { 0% { transform: scale(.94); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
+.pop { animation: pop .22s cubic-bezier(.2,.7,.3,1) both; }
+
+@keyframes shake {
+  0%,100% { transform: translateX(0) }
+  20% { transform: translateX(-6px) } 40% { transform: translateX(6px) }
+  60% { transform: translateX(-4px) } 80% { transform: translateX(4px) }
+}
+.shake { animation: shake .32s ease-in-out; }
+
+/* Netflix card hover: lift, scale, and a red rim light. */
+.nf-card {
+  transition: transform .28s cubic-bezier(.2,.7,.3,1), box-shadow .28s ease, border-color .28s ease;
+}
+@media (hover: hover) {
+  .nf-card:hover {
+    transform: scale(1.015);
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .8);
+    border-color: #3d3d3d;
+  }
+}
+
+/* Profile tile hover, straight off the "Who's watching?" screen. */
+.nf-tile { transition: transform .25s cubic-bezier(.2,.7,.3,1); }
+.nf-avatar {
+  transition: box-shadow .25s ease, filter .25s ease;
+  box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0);
+}
+@media (hover: hover) {
+  .nf-tile:hover { transform: scale(1.06); }
+  .nf-tile:hover .nf-avatar { box-shadow: inset 0 0 0 3px #fff; }
+  .nf-tile:hover .nf-label { color: #fff; }
+}
+.nf-tile:focus-visible { outline: none; transform: scale(1.06); }
+.nf-tile:focus-visible .nf-avatar { box-shadow: inset 0 0 0 3px #fff; }
+
+/* The red sweep that runs under section headings. */
+@keyframes rule-in { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+.rule-red {
+  transform-origin: left;
+  animation: rule-in .6s cubic-bezier(.2,.7,.3,1) both;
+  background: linear-gradient(90deg, var(--color-brand), transparent);
+}
+
+/* Loading/idle shimmer for the progress bar. */
+@keyframes shimmer { to { background-position: 200% 0 } }
+.shimmer {
+  background: linear-gradient(90deg, #2a2a2a 0%, #3a3a3a 40%, #2a2a2a 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* ---------------------------------------------------------------- *
+ * The ident — a TUDUM-style opener
+ * ---------------------------------------------------------------- */
+
+@keyframes ident-bar {
+  0%   { transform: scaleY(0); opacity: 0; }
+  22%  { transform: scaleY(1); opacity: 1; }
+  70%  { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+.ident-bar {
+  transform-origin: center;
+  animation: ident-bar 1.9s cubic-bezier(.16,.9,.3,1) both;
+}
+
+@keyframes ident-word {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; letter-spacing: .3em; }
+  30%  { opacity: 1; }
+  55%  { clip-path: inset(0 0 0 0); letter-spacing: .06em; }
+  80%  { clip-path: inset(0 0 0 0); opacity: 1; transform: scale(1); }
+  100% { clip-path: inset(0 0 0 0); opacity: 0; transform: scale(1.35); }
+}
+.ident-word { animation: ident-word 1.9s cubic-bezier(.16,.9,.3,1) both; }
+
+@keyframes ident-flash {
+  0%, 40% { opacity: 0 }
+  52% { opacity: .55 }
+  100% { opacity: 0 }
+}
+.ident-flash { animation: ident-flash 1.9s ease-out both; }
+
+@keyframes ident-out { to { opacity: 0; visibility: hidden } }
+.ident-shell { animation: ident-out .35s ease-in 1.75s both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-flip, .pop, .shake, .fade-up, .rule-red, .shimmer,
+  .ident-bar, .ident-word, .ident-flash, .ident-shell { animation: none !important; }
+  .nf-card, .nf-tile, .nf-avatar { transition: none !important; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #4a4a4a; }
+::-webkit-scrollbar-track { background: transparent; }
+
+::selection { background: var(--color-brand); color: #fff; }

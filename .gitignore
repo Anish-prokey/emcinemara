@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.log
+.e2e-profile/
+.vercel/
+.netlify/

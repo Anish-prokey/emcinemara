@@ -168,7 +168,7 @@ async function main() {
   console.log(`\nfetching details for ${allIds.length} films (this takes a few minutes)\n`);
 
   const movies = [];
-  const skipped = { noDirector: 0, noCast: 0, noMusic: 0, notIndian: 0 };
+  const skipped = { noDirector: 0, noCast: 0, noMusic: 0, noGenres: 0, noRuntime: 0, notIndian: 0 };
   let done = 0;
 
   for (const batch of chunk(allIds, 12)) {
@@ -191,7 +191,13 @@ async function main() {
       const cast = castOf(d);
       const year = Number((d.release_date ?? "").slice(0, 4));
 
+      const genres = (d.genres ?? []).slice(0, 5).map((g) => g.name);
+
       if (!director) { skipped.noDirector++; continue; }
+      // A film TMDB has no genres for would render an empty Genres clue.
+      if (!genres.length) { skipped.noGenres++; continue; }
+      // Without a runtime this film's share row is one square short of the rest.
+      if (!d.runtime) { skipped.noRuntime++; continue; }
       if (cast.length < 5) { skipped.noCast++; continue; }
       if (!music) { skipped.noMusic++; continue; }
       if (!year || !d.title) continue;
@@ -202,7 +208,7 @@ async function main() {
         original: d.original_title !== d.title ? d.original_title : undefined,
         year,
         lang: d.original_language,
-        genres: (d.genres ?? []).slice(0, 5).map((g) => g.name),
+        genres,
         director,
         music,
         cert: certOf(d),

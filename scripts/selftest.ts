@@ -9,7 +9,7 @@ import {
   MAX_GUESSES,
 } from "../src/lib/puzzle";
 import { searchMovies } from "../src/lib/search";
-import { ALL_MOVIES } from "../src/data/movies";
+import { ALL_MOVIES, HAS_CERTS } from "../src/data/movies";
 import { CERT_LABEL, LANGS, PLAYABLE } from "../src/lib/lang";
 import type { LangCode } from "../src/lib/types";
 
@@ -66,11 +66,20 @@ const dangal = byTitle("Dangal");        // 2016, UA
 check("same year is green", compare(byTitle("Masaan"), byTitle("Piku")).year.state === "hit");
 check("4 years apart is gold", compare(byTitle("Piku"), byTitle("Gully Boy")).year.state === "near");
 check("40 years apart is grey", compare(sholay, byTitle("RRR")).year.state === "miss");
-check("U vs U/A is gold", compare(sholay, dangal).cert.state === "near");
-check("U vs A is grey", compare(sholay, byTitle("Tumbbad")).cert.state === "miss");
+// Pick real examples out of whatever dataset is loaded rather than assuming a
+// particular film carries a particular certificate.
+const withCert = (c: string) => ALL_MOVIES.find((m) => m.cert === c);
+const certU = withCert("U"), certUA = withCert("UA"), certA = withCert("A");
+if (certU && certUA) check("U vs U/A is gold", compare(certU, certUA).cert?.state === "near");
+if (certU && certA) check("U vs A is grey", compare(certU, certA).cert?.state === "miss");
+if (!certU || !certUA) check("dataset carries real certificates", false, "no U/UA pair found");
 
-/* ---- runtime: absent on the seed, active once TMDB data supplies it ---- */
-check("no runtime tile when the data lacks runtimes", compare(sholay, dangal).runtime === undefined);
+/* ---- runtime: driven by whether the loaded dataset actually has runtimes ---- */
+const stripRuntime = (m: typeof sholay) => ({ ...m, runtime: undefined });
+check(
+  "no runtime tile when either film lacks a runtime",
+  compare(stripRuntime(sholay), stripRuntime(dangal)).runtime === undefined,
+);
 
 const withRuntime = (m: typeof sholay, mins: number) => ({ ...m, runtime: mins });
 const rtExact = compare(withRuntime(sholay, 150), withRuntime(dangal, 150));
@@ -83,7 +92,7 @@ check("runtime 40 minutes off is grey", rtFar.runtime?.state === "miss");
 check("runtime adds an eighth square to the share row", [...shareRow(rtExact)].length === 8);
 check(
   "one-sided runtime data still hides the tile",
-  compare(withRuntime(sholay, 150), dangal).runtime === undefined,
+  compare(withRuntime(sholay, 150), stripRuntime(dangal)).runtime === undefined,
 );
 
 /* ---- cross-credit gold ---- */
@@ -150,7 +159,21 @@ const wrong = ALL_MOVIES.filter((m) => m.lang === "ml" && m.id !== answer.id).sl
 const rows = wrong.map((w) => shareRow(compare(w, answer)));
 const width = [...rows[0]].length;
 check("share grid rows are all the same width", rows.every((r) => [...r].length === width), `width ${width}`);
-check("seed share row has 7 clue squares", width === 7);
+
+// Year, rating, director, music, cast and genres are always in play;
+// certificate and runtime only when the loaded dataset carries them.
+const sample = compare(wrong[0], answer);
+const expectedSquares = 6 + (sample.cert ? 1 : 0) + (sample.runtime ? 1 : 0);
+check(
+  `share row has ${expectedSquares} clue squares for this dataset`,
+  width === expectedSquares,
+  `got ${width}`,
+);
+check(
+  "every film can produce a full-width row",
+  ALL_MOVIES.every((m) => Boolean(m.runtime)) || !HAS_CERTS,
+  `${ALL_MOVIES.filter((m) => !m.runtime).length} film(s) lack a runtime`,
+);
 
 function byTitle(t: string) {
   const m = ALL_MOVIES.find((x) => x.title === t);

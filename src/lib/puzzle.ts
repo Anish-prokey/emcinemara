@@ -8,8 +8,16 @@ export const TZ = "Asia/Kolkata";
 export const MAX_GUESSES = 10;
 export const ARCHIVE_DAYS = 50;
 
-/** Only reasonably well-known films become answers; every film stays searchable. */
-const ANSWER_POOL_SIZE = 600;
+/**
+ * Only reasonably well-known films become answers; every film stays searchable.
+ *
+ * Sized against real TMDB vote counts, which run low for Indian cinema - the
+ * most-voted Tamil film has a few hundred votes, not tens of thousands. A pool
+ * of 600 therefore swallowed entire language sets and made a 10-vote obscurity
+ * exactly as likely as 3 Idiots. 150 keeps five months of non-repeating puzzles
+ * while holding answers to films people have plausibly seen.
+ */
+const ANSWER_POOL_SIZE = 150;
 const SHUFFLE_SEED = 0x5f14b1;
 
 const fmt = new Intl.DateTimeFormat("en-CA", {

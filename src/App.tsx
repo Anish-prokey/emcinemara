@@ -30,6 +30,7 @@ import Ident from "./components/Ident";
 import { shouldPlayIdent } from "./lib/ident";
 import { PROFILE } from "./lib/profiles";
 import ClueLegend from "./components/ClueLegend";
+import Confetti from "./components/Confetti";
 import Wordmark from "./components/Wordmark";
 import { HelpIcon, ArchiveIcon, StatsIcon, SettingsIcon } from "./components/icons";
 
@@ -249,6 +250,13 @@ export default function App() {
         </div>
 
         <ClueLegend onOpenHelp={() => setModal("how")} />
+
+        {/* Only for a win that just happened: reloading a finished board must
+            not re-throw confetti at a puzzle solved days ago. Rendered outside
+            EndCard, whose entry animation would otherwise clip it. */}
+        {game.status === "won" && flash !== null && (
+          <Confetti reduceMotion={settings.reduceMotion} />
+        )}
 
         {over && (
           <EndCard

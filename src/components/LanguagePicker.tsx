@@ -17,7 +17,7 @@ export default function LanguagePicker({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black">
       <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-12">
         <div className="fade-up mb-10 text-center">
-          <div className="wordmark text-4xl leading-none sm:text-5xl">FILMI</div>
+          <div className="wordmark text-3xl leading-none sm:text-5xl">EMCINEMARA</div>
           <h1 className="mt-8 text-3xl font-normal text-white sm:text-5xl">
             Who&rsquo;s watching?
           </h1>

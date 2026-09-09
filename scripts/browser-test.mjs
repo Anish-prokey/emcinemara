@@ -154,7 +154,7 @@ const profileCount = await evaluate(`document.querySelectorAll('.nf-tile').lengt
 check("first run shows five profile tiles", profileCount === 5, `saw ${profileCount}`);
 check(
   "the opener played and marked itself",
-  (await evaluate(`sessionStorage.getItem('filmi.identShown')`)) === "1",
+  (await evaluate(`sessionStorage.getItem('emcinemara.identShown')`)) === "1",
 );
 
 /* ---- 2. picking a profile starts that puzzle ---- */
@@ -167,7 +167,7 @@ if (!heading) {
 }
 check("picking a profile opens its board", Boolean(heading), String(heading));
 
-const lang = await evaluate(`JSON.parse(localStorage.getItem('filmi.v2.settings')).lang`);
+const lang = await evaluate(`JSON.parse(localStorage.getItem('emcinemara.v1.settings')).lang`);
 check("the chosen profile is persisted", Boolean(lang), String(lang));
 
 /* ---- 3. dismiss the how-to that opens on first play ---- */

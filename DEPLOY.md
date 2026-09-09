@@ -1,4 +1,4 @@
-# Hosting Filmi
+# Hosting Emcinemara
 
 `dist/` is a plain static folder. No server, no database, no environment
 variables, no build step on the host if you upload it pre-built. Any static
@@ -14,7 +14,7 @@ npm run build
 ## Fastest: drag and drop (about 60 seconds, no CLI)
 
 1. Open <https://app.netlify.com/drop>
-2. Drag the **`dist`** folder onto the page (or upload `dist/filmi-site.zip`)
+2. Drag the **`dist`** folder onto the page (or upload `dist/emcinemara-site.zip`)
 3. You get a public URL immediately, e.g. `https://swift-tiger-123.netlify.app`
 
 Sign in afterwards to keep the site and rename it. Cloudflare Pages offers the
@@ -22,7 +22,7 @@ same thing under "Direct Upload".
 
 ## Single file, if you want the simplest possible thing
 
-`dist/filmi-standalone.html` is the entire game in one file — CSS and JS
+`dist/emcinemara-standalone.html` is the entire game in one file — CSS and JS
 inlined. Rename it `index.html`, drop it on any host, email it, or open it
 straight from disk. Nothing else needs to come with it.
 

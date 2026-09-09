@@ -58,8 +58,8 @@ export default function Ident({ onDone }: { onDone: () => void }) {
       {/* the blowout flash at the moment the letters land */}
       <div className="ident-flash pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_50%,rgba(255,60,70,.9),transparent_70%)]" />
 
-      <h1 className="ident-word wordmark relative z-10 text-[clamp(3.5rem,17vw,11rem)] leading-none">
-        FILMI
+      <h1 className="ident-word wordmark relative z-10 text-[clamp(1.6rem,8vw,6rem)] leading-none">
+        EMCINEMARA
       </h1>
 
       <p className="absolute bottom-10 text-[11px] tracking-[0.35em] text-[var(--color-muted)] uppercase">

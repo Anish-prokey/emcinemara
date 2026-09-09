@@ -41,7 +41,7 @@ const PAGE = Number(arg("page", 200));
 
 const SPARQL = "https://query.wikidata.org/sparql";
 const RATINGS = "https://datasets.imdbws.com/title.ratings.tsv.gz";
-const UA = "Filmi/1.0 (daily Indian movie game; contact via repository)";
+const UA = "Emcinemara/1.0 (daily Indian movie game; contact via repository)";
 
 /** Wikidata item ids for the five industries the game ships. */
 const LANGS = [

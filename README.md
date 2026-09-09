@@ -1,4 +1,4 @@
-# Filmi
+# Emcinemara
 
 A daily Indian-cinema guessing game, in the shape of [Spotle Movies](https://spotle.movie/).
 One film a day, ten guesses, and a row of clues that tell you how close you landed.
@@ -166,8 +166,8 @@ on every client, and no film repeats until that language's pool is exhausted.
 Search is scoped to the chosen industry: in the Tamil puzzle, Hindi titles do not appear in the
 dropdown at all.
 
-Progress and stats are stored per language (`filmi.v2.game.<lang>.<date>`,
-`filmi.v2.stats.<lang>`), so switching industries never disturbs another streak. A `?lang=ta` in
+Progress and stats are stored per language (`emcinemara.v1.game.<lang>.<date>`,
+`emcinemara.v1.stats.<lang>`), so switching industries never disturbs another streak. A `?lang=ta` in
 the URL opens that industry directly, which makes shared links land in the right place.
 
 Archive replays (`?d=2026-08-19&lang=ta`, or the ▦ button) work for the last 50 days and

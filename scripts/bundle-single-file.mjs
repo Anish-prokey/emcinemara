@@ -16,7 +16,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 
 const DIST = resolve("dist");
-const OUT = resolve(process.argv[2] || "dist/filmi-standalone.html");
+const OUT = resolve(process.argv[2] || "dist/emcinemara-standalone.html");
 
 const html = readFileSync(join(DIST, "index.html"), "utf8");
 
@@ -32,7 +32,7 @@ const favicon = readFileSync(join(DIST, "favicon.svg"), "utf8");
 const titleFlag = process.argv.find((a) => a.startsWith("--title="));
 const title = titleFlag
   ? titleFlag.slice("--title=".length)
-  : (html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "Filmi");
+  : (html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "Emcinemara");
 const fontLink =
   html.match(/<link href="https:\/\/fonts\.googleapis\.com[^>]*>/)?.[0] ?? "";
 

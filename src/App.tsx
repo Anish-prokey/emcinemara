@@ -173,13 +173,13 @@ export default function App() {
       {ident && <Ident onDone={() => setIdent(false)} />}
 
       <header className="sticky top-0 z-20 bg-gradient-to-b from-black via-black/92 to-transparent backdrop-blur-[2px]">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-2 px-2 py-3 sm:gap-3 sm:px-4">
           <button
             onClick={() => setDay(today)}
             title="Back to today"
             className="text-left transition-transform hover:scale-[1.04]"
           >
-            <span className="wordmark text-2xl leading-none sm:text-3xl">FILMI</span>
+            <span className="wordmark text-lg leading-none sm:text-3xl">EMCINEMARA</span>
           </button>
 
           <div className="flex items-center gap-1.5">
@@ -338,7 +338,7 @@ function IconBtn({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="grid size-9 place-items-center rounded text-base text-[var(--color-muted)] transition hover:scale-110 hover:text-white"
+      className="grid size-8 place-items-center rounded text-base text-[var(--color-muted)] transition hover:scale-110 hover:text-white sm:size-9"
     >
       {children}
     </button>

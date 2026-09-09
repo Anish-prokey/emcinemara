@@ -1,7 +1,31 @@
 import type { GameState, Stats, LangCode } from "./types";
 import { isPlayable } from "./lang";
 
-const NS = "filmi.v2";
+const NS = "emcinemara.v1";
+const LEGACY_NS = "filmi.v2";
+
+/**
+ * The app was called Filmi before it was called Emcinemara, and the old name is
+ * baked into every saved key. Copy them across once so the rename does not wipe
+ * anyone's streaks, then never look again.
+ */
+(function migrateFromLegacyName() {
+  try {
+    if (localStorage.getItem(`${NS}.migrated`)) return;
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(`${LEGACY_NS}.`)) continue;
+      const moved = NS + key.slice(LEGACY_NS.length);
+      // Never clobber progress already made under the new name.
+      if (localStorage.getItem(moved) === null) {
+        const value = localStorage.getItem(key);
+        if (value !== null) localStorage.setItem(moved, value);
+      }
+    }
+    localStorage.setItem(`${NS}.migrated`, "1");
+  } catch {
+    /* storage blocked - the player simply starts fresh */
+  }
+})();
 
 function read<T>(key: string, fallback: T): T {
   try {

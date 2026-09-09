@@ -113,14 +113,22 @@ export type Settings = {
   /** null until the player has picked an industry. */
   lang: LangCode | null;
   reduceMotion: boolean;
+  /** Defaults on: the audio cues carry real information about how close a
+   *  guess landed, so starting muted hides part of the game. One click in the
+   *  header turns it off and the choice sticks. */
+  sound: boolean;
 };
 
-export const DEFAULT_SETTINGS: Settings = { lang: null, reduceMotion: false };
+export const DEFAULT_SETTINGS: Settings = { lang: null, reduceMotion: false, sound: true };
 
 export function loadSettings(): Settings {
   const s = read<Settings>(`${NS}.settings`, DEFAULT_SETTINGS);
-  // guard against a hand-edited or stale value
-  return { ...s, lang: s.lang && isPlayable(s.lang) ? s.lang : null };
+  return {
+    ...DEFAULT_SETTINGS,
+    ...s,
+    // guard against a hand-edited or stale value
+    lang: s.lang && isPlayable(s.lang) ? s.lang : null,
+  };
 }
 
 export const saveSettings = (s: Settings) => write(`${NS}.settings`, s);

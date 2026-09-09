@@ -4,6 +4,8 @@ import { shareRow } from "../lib/compare";
 import { MAX_GUESSES, formatCountdown, msUntilNextPuzzle } from "../lib/puzzle";
 import { CERT_LABEL, LANGS } from "../lib/lang";
 import Poster from "./Poster";
+import { gradeFor, nextMilestone } from "../lib/grade";
+import { FlameIcon } from "./icons";
 
 export default function EndCard({
   won,
@@ -13,6 +15,9 @@ export default function EndCard({
   isToday,
   lang,
   onStats,
+  streak,
+  milestone,
+  animate,
 }: {
   won: boolean;
   answer: Movie;
@@ -21,6 +26,10 @@ export default function EndCard({
   isToday: boolean;
   lang: LangCode;
   onStats: () => void;
+  streak: number;
+  /** Set only when this win crossed a milestone, so it is worth shouting about. */
+  milestone: number | null;
+  animate: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [left, setLeft] = useState(msUntilNextPuzzle());
@@ -31,9 +40,15 @@ export default function EndCard({
     return () => clearInterval(t);
   }, [isToday]);
 
+  const grade = won ? gradeFor(comparisons.length) : null;
   const scoreLine = won ? `${comparisons.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
   const text =
-    `EmCinemaRa ${LANGS[lang].name} #${puzzleNum} ${scoreLine}\n` +
+    `EmCinemaRa ${LANGS[lang].name} #${puzzleNum} ${scoreLine}` +
+    // The grade is the line people quote at each other, so it travels with
+    // the grid rather than staying locked inside the app.
+    (grade ? ` · ${grade.title}` : "") +
+    (streak > 1 ? ` · ${streak}-day streak` : "") +
+    "\n" +
     comparisons.map(shareRow).join("\n") +
     `\n${location.origin}`;
 
@@ -73,14 +88,48 @@ export default function EndCard({
         )}
       </div>
 
-      <div className="display text-3xl">
-        {won ? "Picture perfect." : "Cut. That is a wrap."}
+      <div
+        data-testid="verdict"
+        className={`display text-3xl ${won && animate ? "grade-in" : ""}`}
+      >
+        {won ? grade!.title : "Cut. That is a wrap."}
       </div>
       <p className="mt-1 text-sm text-[var(--color-muted)]">
         {won
-          ? `Nailed it in ${comparisons.length} ${comparisons.length === 1 ? "guess" : "guesses"}.`
+          ? `${grade!.blurb} Solved in ${comparisons.length} ${comparisons.length === 1 ? "guess" : "guesses"}.`
           : `Ten guesses gone. The film was:`}
       </p>
+
+      {won && streak > 0 && (
+        <div
+          data-testid="streak-line"
+          className={`mt-2.5 flex items-center gap-2 rounded border px-3 py-2 ${
+            milestone
+              ? "border-[var(--color-brand)]/60 bg-[var(--color-brand)]/15"
+              : "border-[var(--color-line)] bg-black/40"
+          } ${milestone && animate ? "pop" : ""}`}
+        >
+          <span className={`text-[var(--color-brand-glow)] ${animate ? "flame" : ""}`}>
+            <FlameIcon />
+          </span>
+          {milestone ? (
+            <span className="text-sm font-bold text-white">
+              {milestone}-day streak. That is a run.
+            </span>
+          ) : (
+            <span className="text-sm text-[var(--color-fg)]/85">
+              <b className="tabular-nums">{streak}</b> day
+              {streak === 1 ? "" : "s"} in a row
+              {nextMilestone(streak) !== null && (
+                <span className="text-[var(--color-muted)]">
+                  {" "}
+                  · {nextMilestone(streak)! - streak} more to {nextMilestone(streak)}
+                </span>
+              )}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Poster beside the title on every size, but the credit list drops below
           it on a phone — sharing that row leaves the cast about 160px wide,

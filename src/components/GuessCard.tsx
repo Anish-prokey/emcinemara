@@ -3,6 +3,8 @@ import { CERT_LABEL } from "../lib/lang";
 import Tile, { stateClass } from "./Tile";
 import Poster from "./Poster";
 import { CLUE_HELP } from "../lib/clues";
+import HeatMeter from "./HeatMeter";
+import type { HeatReading } from "../lib/heat";
 
 const CAST_LABELS = ["Lead", "Cast 2", "Cast 3", "Cast 4", "Cast 5"];
 
@@ -13,12 +15,14 @@ export default function GuessCard({
   index,
   animate,
   latest,
+  reading,
 }: {
   c: Comparison;
   index: number;
   animate: boolean;
   /** The newest guess, which gets the red "now playing" spine. */
   latest: boolean;
+  reading: HeatReading;
 }) {
   const m = c.movie;
   const d = (n: number) => (animate ? n * 70 : 0);
@@ -41,6 +45,10 @@ export default function GuessCard({
           }`}
         />
       )}
+
+      <div className="pl-1.5">
+        <HeatMeter reading={reading} animate={animate} correct={c.correct} />
+      </div>
 
       <div className="flex gap-2.5 pl-1.5 sm:gap-3">
         <Poster

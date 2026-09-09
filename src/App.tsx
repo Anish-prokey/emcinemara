@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { GameState, LangCode, Movie, Stats } from "./lib/types";
+import type { Comparison, GameState, LangCode, Movie, Stats } from "./lib/types";
 import { compare } from "./lib/compare";
 import { answerFor, dateKey, dayIndex, prettyDate, MAX_GUESSES } from "./lib/puzzle";
 import { LANGS, isPlayable } from "./lib/lang";
@@ -32,7 +32,18 @@ import { PROFILE } from "./lib/profiles";
 import ClueLegend from "./components/ClueLegend";
 import Confetti from "./components/Confetti";
 import Wordmark from "./components/Wordmark";
-import { HelpIcon, ArchiveIcon, StatsIcon, SettingsIcon } from "./components/icons";
+import {
+  HelpIcon,
+  ArchiveIcon,
+  StatsIcon,
+  SettingsIcon,
+  SoundOnIcon,
+  SoundOffIcon,
+  FlameIcon,
+} from "./components/icons";
+import { readings, type HeatReading } from "./lib/heat";
+import { gradeFor, isMilestone } from "./lib/grade";
+import * as sfx from "./lib/sound";
 
 type ModalId = "how" | "stats" | "archive" | "settings" | null;
 
@@ -56,6 +67,8 @@ export default function App() {
   const [picking, setPicking] = useState(false);
   const [modal, setModal] = useState<ModalId>(null);
   const [flash, setFlash] = useState<number | null>(null);
+  /** Set only for a milestone crossed by the win that just happened. */
+  const [milestone, setMilestone] = useState<number | null>(null);
   // `settings` is resolved above, so the saved reduce-motion choice suppresses
   // the opener too — not just the tile flips.
   const [ident, setIdent] = useState(() => shouldPlayIdent(loadSettings().reduceMotion));
@@ -71,12 +84,35 @@ export default function App() {
     settings.lang ? loadStats(settings.lang) : EMPTY_STATS,
   );
 
+  useEffect(() => {
+    sfx.setMuted(!settings.sound);
+  }, [settings.sound]);
+
+  /* One switch for every animation, rather than each component deciding for
+     itself — the looping ones were the easiest to forget. */
+  useEffect(() => {
+    document.documentElement.classList.toggle("reduce-motion", settings.reduceMotion);
+  }, [settings.reduceMotion]);
+
+  /* Browsers refuse to make a sound until the page has been interacted with,
+     so the audio engine is started by the first gesture, whatever it is. */
+  useEffect(() => {
+    const go = () => sfx.unlock();
+    window.addEventListener("pointerdown", go, { once: true });
+    window.addEventListener("keydown", go, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", go);
+      window.removeEventListener("keydown", go);
+    };
+  }, []);
+
   /* Reload the board whenever the language or the day changes. */
   useEffect(() => {
     if (!lang) return;
     setGame(loadGame(lang, day));
     setStats(loadStats(lang));
     setFlash(null);
+    setMilestone(null);
   }, [lang, day]);
 
   /* Show the rules once, after the opener and the profile pick have cleared. */
@@ -106,6 +142,7 @@ export default function App() {
     () => (answer ? guesses.map((g) => compare(g, answer)) : []),
     [guesses, answer],
   );
+  const heat = useMemo(() => readings(comparisons), [comparisons]);
   const guessedIds = useMemo(() => new Set(game?.guesses ?? []), [game]);
 
   if (!lang || !game || !answer) {
@@ -145,9 +182,50 @@ export default function App() {
     saveGame(next);
     setFlash(m.id);
 
+    // Read the new guess before React re-renders, so the cues can be scheduled
+    // against the same clock the tiles animate on.
+    const c = compare(m, answer);
+    const all = readings([...comparisons, c]);
+    playGuess(c, all[all.length - 1], won, lost, MAX_GUESSES - nextGuesses.length);
+
     if ((won || lost) && isToday) {
-      setStats(recordResult(lang, day, won, nextGuesses.length));
+      const s = recordResult(lang, day, won, nextGuesses.length);
+      setStats(s);
+      if (won && isMilestone(s.streak)) {
+        setMilestone(s.streak);
+        sfx.milestone();
+      }
     }
+  }
+
+  /**
+   * The audio for one guess, scheduled in a single pass.
+   *
+   * The cues are laid over the tile flips deliberately: ticks track the squares
+   * as they turn, then a sweep whose landing pitch *is* the heat score, so the
+   * result arrives in the ear a beat before it is read off the meter.
+   */
+  function playGuess(
+    c: Comparison,
+    r: HeatReading,
+    won: boolean,
+    lost: boolean,
+    remainingAfter: number,
+  ) {
+    sfx.submit();
+
+    const stagger = settings.reduceMotion ? 0 : 0.07;
+    const ticks = revealOrder(c);
+    ticks.forEach((state, i) => sfx.reveal(state, i, i * stagger));
+
+    const settled = ticks.length * stagger + 0.12;
+    sfx.verdict(r.heat, settled);
+
+    if (!won && r.delta !== null && r.delta > 0) sfx.warmer(settled + 0.34);
+
+    if (won) setTimeout(() => sfx.win(gradeFor(comparisons.length + 1).reach), (settled + 0.3) * 1000);
+    else if (lost) setTimeout(() => sfx.lose(), (settled + 0.3) * 1000);
+    else if (remainingAfter <= 2) sfx.tension(settled + 0.55);
   }
 
   function switchLanguage(l: LangCode) {
@@ -179,7 +257,7 @@ export default function App() {
           <button
             onClick={() => setDay(today)}
             title="Back to today"
-            className="text-left transition-transform hover:scale-[1.04]"
+            className="min-w-0 shrink text-left transition-transform hover:scale-[1.04]"
           >
             <Wordmark className="text-lg leading-none sm:text-3xl" />
           </button>
@@ -200,10 +278,32 @@ export default function App() {
               <span className="hidden text-sm text-[var(--color-muted)] sm:inline">
                 {LANGS[lang].name}
               </span>
-              <span className="text-[10px] text-[var(--color-muted)]">▼</span>
+              <span className="hidden text-[10px] text-[var(--color-muted)] sm:inline">▼</span>
             </button>
 
+            {stats.streak > 0 && (
+              <button
+                onClick={() => setModal("stats")}
+                title={`${stats.streak}-day ${LANGS[lang].name} streak — best ${stats.best}`}
+                className="flex shrink-0 items-center gap-0.5 rounded-full border border-[var(--color-brand)]/40 bg-[var(--color-brand)]/12 px-1.5 py-1 text-[var(--color-brand-glow)] transition hover:bg-[var(--color-brand)]/25 sm:gap-1 sm:px-2"
+              >
+                <span className={animate ? "flame" : ""}>
+                  <FlameIcon />
+                </span>
+                <span className="text-xs font-bold tabular-nums">{stats.streak}</span>
+              </button>
+            )}
+
             <nav className="flex items-center gap-0.5">
+              <IconBtn
+                label={settings.sound ? "Mute" : "Unmute"}
+                onClick={() => {
+                  sfx.unlock();
+                  updateSettings({ ...settings, sound: !settings.sound });
+                }}
+              >
+                {settings.sound ? <SoundOnIcon /> : <SoundOffIcon />}
+              </IconBtn>
               <IconBtn label="How to play" onClick={() => setModal("how")}>
                 <HelpIcon />
               </IconBtn>
@@ -236,7 +336,12 @@ export default function App() {
           <h1 className="display mt-1.5 text-3xl leading-none sm:text-4xl">Guess the film</h1>
           <p className="mt-1 text-xs text-[var(--color-muted)]">{prettyDate(day)}</p>
 
-          <Progress used={game.guesses.length} total={MAX_GUESSES} status={game.status} />
+          <Progress
+            used={game.guesses.length}
+            total={MAX_GUESSES}
+            status={game.status}
+            urgent={!over && remaining <= 2 && animate}
+          />
         </div>
 
         <div className="mb-4">
@@ -255,7 +360,10 @@ export default function App() {
             not re-throw confetti at a puzzle solved days ago. Rendered outside
             EndCard, whose entry animation would otherwise clip it. */}
         {game.status === "won" && flash !== null && (
-          <Confetti reduceMotion={settings.reduceMotion} />
+          <Confetti
+            reduceMotion={settings.reduceMotion}
+            intensity={gradeFor(comparisons.length).reach}
+          />
         )}
 
         {over && (
@@ -267,6 +375,9 @@ export default function App() {
             isToday={isToday}
             lang={lang}
             onStats={() => setModal("stats")}
+            streak={isToday ? stats.streak : 0}
+            milestone={milestone}
+            animate={animate && flash !== null}
           />
         )}
 
@@ -284,6 +395,7 @@ export default function App() {
                   index={i}
                   latest={i === comparisons.length - 1}
                   animate={animate && c.movie.id === flash}
+                  reading={heat[i]}
                 />
               ))}
           </ul>
@@ -333,6 +445,28 @@ export default function App() {
   );
 }
 
+/**
+ * The squares a tick is played for, in the order the eye meets them.
+ *
+ * Cast and genres collapse to one tick each rather than ten: the full set fired
+ * as a burst reads as a rattle, not as feedback. The group tick reports the
+ * best square in the group, which is the one that matters.
+ */
+function revealOrder(c: Comparison): ("hit" | "near" | "miss")[] {
+  const best = (tiles: { state: "hit" | "near" | "miss" }[]) =>
+    tiles.some((t) => t.state === "hit")
+      ? "hit"
+      : tiles.some((t) => t.state === "near")
+        ? "near"
+        : "miss";
+
+  const out: ("hit" | "near" | "miss")[] = [c.year.state, c.score.state];
+  if (c.cert) out.push(c.cert.state);
+  if (c.runtime) out.push(c.runtime.state);
+  out.push(c.director.state, c.music.state, best(c.cast), best(c.genres));
+  return out;
+}
+
 function IconBtn({
   label,
   onClick,
@@ -347,7 +481,7 @@ function IconBtn({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="grid size-8 place-items-center rounded text-base text-[var(--color-muted)] transition hover:scale-110 hover:text-white sm:size-9"
+      className="grid size-7 shrink-0 place-items-center rounded text-base text-[var(--color-muted)] transition hover:scale-110 hover:text-white sm:size-9"
     >
       {children}
     </button>
@@ -355,7 +489,18 @@ function IconBtn({
 }
 
 /** The scrub bar under a Netflix title card: red fill on a grey track. */
-function Progress({ used, total, status }: { used: number; total: number; status: string }) {
+function Progress({
+  used,
+  total,
+  status,
+  urgent,
+}: {
+  used: number;
+  total: number;
+  status: string;
+  /** Down to the last couple of guesses — the bar starts breathing. */
+  urgent?: boolean;
+}) {
   const fill =
     status === "won"
       ? "var(--color-hit-2)"
@@ -366,12 +511,16 @@ function Progress({ used, total, status }: { used: number; total: number; status
     <div className="mt-3 flex items-center gap-3">
       <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-[#404040]">
         <div
-          className="h-full rounded-full transition-[width] duration-500 ease-out"
+          className={`h-full rounded-full transition-[width] duration-500 ease-out ${urgent ? "tension" : ""}`}
           style={{ width: `${(used / total) * 100}%`, background: fill }}
         />
       </div>
-      <span className="text-[11px] tabular-nums text-[var(--color-muted)]">
-        {used} of {total}
+      <span
+        className={`text-[11px] tabular-nums ${
+          urgent ? "font-bold text-[var(--color-brand-glow)]" : "text-[var(--color-muted)]"
+        }`}
+      >
+        {urgent ? `${total - used} left` : `${used} of ${total}`}
       </span>
     </div>
   );

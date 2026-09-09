@@ -56,6 +56,19 @@ export default function SettingsPanel({
       </div>
 
       <div>
+        <h3 className="display mb-1 text-lg">Sound</h3>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={settings.sound}
+            onChange={(e) => onChange({ ...settings, sound: e.target.checked })}
+            className="size-4 accent-[var(--color-brand)]"
+          />
+          Audio cues — the tone after each guess rises with how close you landed
+        </label>
+      </div>
+
+      <div>
         <h3 className="display mb-1 text-lg">Motion</h3>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input

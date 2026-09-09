@@ -9,6 +9,8 @@ import {
   MAX_GUESSES,
 } from "../src/lib/puzzle";
 import { searchMovies } from "../src/lib/search";
+import { heatOf, readings, bandFor } from "../src/lib/heat";
+import { gradeFor, isMilestone, nextMilestone } from "../src/lib/grade";
 import { ALL_MOVIES, HAS_CERTS } from "../src/data/movies";
 import { CERT_LABEL, LANGS, PLAYABLE } from "../src/lib/lang";
 import type { LangCode } from "../src/lib/types";
@@ -179,6 +181,74 @@ function byTitle(t: string) {
   const m = ALL_MOVIES.find((x) => x.title === t);
   if (!m) throw new Error(`seed is missing "${t}"`);
   return m;
+}
+
+
+/* ---- heat: the "am I getting warmer" score ---- */
+{
+  const lang = PLAYABLE[0] as LangCode;
+  const target = answerFor(lang, dateKey());
+  const others = ALL_MOVIES.filter((m) => m.lang === lang && m.id !== target.id);
+
+  check("a correct guess is exactly 100", heatOf(compare(target, target)) === 100);
+
+  const scores = others.map((m) => heatOf(compare(m, target)));
+  check(
+    "every heat score stays inside 0-100",
+    scores.every((v) => v >= 0 && v <= 100 && Number.isInteger(v)),
+    `min ${Math.min(...scores)} max ${Math.max(...scores)}`,
+  );
+  check(
+    "a wrong guess never reaches 100",
+    scores.every((v) => v < 100),
+    `${scores.filter((v) => v === 100).length} wrong guess(es) scored 100`,
+  );
+  // The meter is worthless if every guess lands in the same band.
+  const bands = new Set(scores.map((v) => bandFor(v).key));
+  check("wrong guesses spread across several bands", bands.size >= 3, `${bands.size} band(s)`);
+
+  const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+  check("a typical wrong guess reads cool, not warm", mean < 40, `mean ${mean.toFixed(1)}`);
+
+  // Heat must be a pure function of the tiles, so it can never leak more than
+  // the board already shows.
+  const twice = others.slice(0, 40).every((m) => heatOf(compare(m, target)) === heatOf(compare(m, target)));
+  check("heat is deterministic", twice);
+}
+
+/* ---- readings: deltas and the "closest yet" flag ---- */
+{
+  const lang = PLAYABLE[0] as LangCode;
+  const target = answerFor(lang, dateKey());
+  const picks = ALL_MOVIES.filter((m) => m.lang === lang && m.id !== target.id).slice(0, 6);
+  const rs = readings([...picks.map((m) => compare(m, target)), compare(target, target)]);
+
+  check("the first guess has no delta to report", rs[0].delta === null);
+  check("the first guess is always the closest so far", rs[0].best === true);
+  check("the winning guess is the closest of the run", rs[rs.length - 1].best === true);
+  check(
+    "a guess is flagged best only when it beats every earlier one",
+    rs.every((r, i) => r.best === (r.heat > Math.max(-1, ...rs.slice(0, i).map((x) => x.heat)))),
+  );
+  check(
+    "a positive delta always accompanies a new best",
+    rs.every((r) => r.delta === null || r.delta <= 0 || r.best),
+  );
+}
+
+/* ---- grades ---- */
+{
+  const all = Array.from({ length: MAX_GUESSES }, (_, i) => gradeFor(i + 1));
+  check("every guess count has a grade", all.every((g) => g.title.length > 0));
+  check(
+    "reach falls as the solve gets slower",
+    all.every((g, i) => i === 0 || g.reach <= all[i - 1].reach),
+  );
+  check("reach stays inside 0-1", all.every((g) => g.reach > 0 && g.reach <= 1));
+  check("a one-guess solve outranks a ten-guess one", all[0].reach > all[all.length - 1].reach);
+  check("milestones are recognised", isMilestone(7) && !isMilestone(8));
+  check("the next milestone is always ahead", (nextMilestone(7) ?? 0) > 7);
+  check("a long streak eventually runs out of milestones", nextMilestone(100000) === null);
 }
 
 console.log(failures === 0 ? "\nall checks passed\n" : `\n${failures} check(s) failed\n`);

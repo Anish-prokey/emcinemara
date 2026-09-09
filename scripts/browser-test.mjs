@@ -252,7 +252,17 @@ const nav = JSON.parse(await evaluate(`JSON.stringify(
     svg: Boolean(b.querySelector('svg')),
   }))
 )`));
-check("every header control is labelled", nav.length === 4 && nav.every((b) => b.label), JSON.stringify(nav));
+const EXPECTED_NAV = ["Mute", "How to play", "Archive", "Stats", "Settings"];
+check(
+  "every header control is labelled",
+  nav.length === EXPECTED_NAV.length && nav.every((b) => b.label),
+  JSON.stringify(nav),
+);
+check(
+  "the header carries exactly the controls we expect",
+  nav.map((b) => b.label).join() === EXPECTED_NAV.join(),
+  nav.map((b) => b.label).join(),
+);
 check("header controls use real icons, not text glyphs", nav.every((b) => b.svg), JSON.stringify(nav));
 
 /* ---- tiles explain their own rule on hover ---- */
@@ -269,6 +279,199 @@ await S("Emulation.setDeviceMetricsOverride", {
 await sleep(500);
 const overflow = await evaluate(`document.documentElement.scrollWidth - document.documentElement.clientWidth`);
 check("no horizontal overflow at 390px", overflow === 0, `overflow ${overflow}px`);
+
+/* The header is at its widest once a streak chip sits beside the five
+   controls, so it is worth measuring in that state and not only bare. */
+await evaluate(`(() => {
+  // Mid-game there is no stats record yet, so derive the key from the profile
+  // the test picked rather than looking for one that cannot be there.
+  const lang = JSON.parse(localStorage.getItem("emcinemara.v1.settings") || "{}").lang;
+  if (!lang) return false;
+  const k = "emcinemara.v1.stats." + lang;
+  localStorage.setItem(k, JSON.stringify({
+    played: 188, wins: 188, streak: 188, best: 188, lastDay: null, dist: {},
+  }));
+  return true;
+})()`);
+await S("Page.reload");
+await sleep(2200);
+check(
+  "a long streak shows in the header",
+  (await evaluate(`Boolean(document.querySelector('header button[title*="streak"]'))`)) === true,
+);
+const overflowStreak = await evaluate(
+  `document.documentElement.scrollWidth - document.documentElement.clientWidth`,
+);
+check(
+  "no horizontal overflow at 390px with a streak chip",
+  overflowStreak === 0,
+  `overflow ${overflowStreak}px`,
+);
+
+/* ---- 8. the win, and the celebration that rides on it ----
+
+   Reaching a win needs the answer, and the only place the app states it is the
+   card shown after a loss. So: burn the ten guesses to learn the film, wipe the
+   board, then play it back as a one-guess win. That also buys the first real
+   coverage of the winning path — grade, streak line and confetti. */
+
+/** Type a letter and take the first suggestion, whatever it is. */
+async function guessAnything(seed) {
+  await evaluate(`(() => {
+    const i = document.querySelector('input[aria-label="Search for a movie"]');
+    if (!i) return false;
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    i.focus(); set.call(i, ${JSON.stringify(seed)});
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await sleep(420);
+  return evaluate(`(() => {
+    const b = document.querySelector('[role="option"] button');
+    if (!b) return false;
+    b.click();
+    return true;
+  })()`);
+}
+
+const LETTERS = "aeiorntslumk".split("");
+for (let i = 0; i < 12; i++) {
+  const done = await evaluate(`document.querySelector('input[aria-label="Search for a movie"]').disabled`);
+  if (done) break;
+  await guessAnything(LETTERS[i % LETTERS.length]);
+  await sleep(260);
+}
+
+const answerTitle = await evaluate(
+  `document.querySelector('main .display.text-2xl')?.textContent?.trim() ?? null`,
+);
+check("burning every guess reveals the film", Boolean(answerTitle), String(answerTitle));
+
+// Wipe just today's board, keeping the profile, and play the known answer.
+await evaluate(`(() => {
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith("emcinemara.v1.game.")) localStorage.removeItem(k);
+  }
+  // The loss above already recorded today, and a day is only ever counted
+  // once, so clear that too or the replayed win records nothing.
+  const lang = JSON.parse(localStorage.getItem("emcinemara.v1.settings") || "{}").lang;
+  localStorage.setItem("emcinemara.v1.stats." + lang, JSON.stringify({
+    played: 5, wins: 5, streak: 5, best: 5, lastDay: null, dist: {},
+  }));
+  return true;
+})()`);
+await S("Page.reload");
+await sleep(2200);
+await guessAnything(answerTitle);
+await sleep(1200);
+
+const winState = JSON.parse(await evaluate(`(() => {
+  const de = document.documentElement;
+  const c = document.querySelector("canvas");
+  const r = c && c.getBoundingClientRect();
+  return JSON.stringify({
+    grade: document.querySelector('[data-testid="verdict"]')?.textContent?.trim() ?? null,
+    canvas: Boolean(c),
+    canvasW: r ? Math.round(r.width) : 0,
+    clientW: de.clientWidth,
+    overflow: de.scrollWidth - de.clientWidth,
+    streakLine: Boolean(document.querySelector('[data-testid="streak-line"]')),
+  });
+})()`));
+
+check("a one-guess win is graded", winState.grade === "One-take wonder", String(winState.grade));
+check("the win throws confetti", winState.canvas === true);
+check(
+  "the confetti canvas never exceeds the visible viewport",
+  winState.canvas && winState.canvasW <= winState.clientW,
+  `canvas ${winState.canvasW}px vs viewport ${winState.clientW}px`,
+);
+check(
+  "no horizontal overflow at 390px on a win",
+  winState.overflow === 0,
+  `overflow ${winState.overflow}px`,
+);
+check("the win card reports the streak", winState.streakLine === true);
+
+/* The same 390px width, but as a narrow desktop rather than a phone.
+   This is not redundant: emulated mobile gets overlay scrollbars, so the page
+   keeps the full 390px, while a real narrow window loses 12px to a classic
+   scrollbar gutter. The header shipped overflowing by exactly that 12px, and
+   the phone-width check above could never see it. */
+await S("Emulation.setDeviceMetricsOverride", {
+  width: 390, height: 844, deviceScaleFactor: 1, mobile: false,
+});
+await sleep(600);
+// A CDP metrics override resizes the viewport without firing the resize event
+// a real window resize would, and the canvas re-measures itself on that event.
+await evaluate(`(window.dispatchEvent(new Event("resize")), true)`);
+await sleep(300);
+const narrow = JSON.parse(await evaluate(`(() => {
+  const de = document.documentElement;
+  const c = document.querySelector("canvas");
+  const r = c && c.getBoundingClientRect();
+  const head = document.querySelector("header > div");
+  return JSON.stringify({
+    clientW: de.clientWidth,
+    gutter: window.innerWidth - de.clientWidth,
+    overflow: de.scrollWidth - de.clientWidth,
+    // The row itself is width-constrained; it is the controls group inside it
+    // that pushes past the edge, so measure that.
+    headerRight: head
+      ? Math.round(head.lastElementChild.getBoundingClientRect().right)
+      : 0,
+    canvasW: r ? Math.round(r.width) : 0,
+    canvas: Boolean(c),
+  });
+})()`));
+
+check(
+  "a narrow window really does have a scrollbar gutter",
+  narrow.gutter > 0,
+  `gutter ${narrow.gutter}px`,
+);
+check(
+  "the header fits a narrow window once the gutter is taken",
+  narrow.headerRight <= narrow.clientW,
+  `header reaches ${narrow.headerRight}px in a ${narrow.clientW}px viewport`,
+);
+check(
+  "no horizontal overflow in a 390px window with a scrollbar",
+  narrow.overflow === 0,
+  `overflow ${narrow.overflow}px`,
+);
+check(
+  "the confetti canvas fits beside a scrollbar",
+  !narrow.canvas || narrow.canvasW <= narrow.clientW,
+  `canvas ${narrow.canvasW}px vs viewport ${narrow.clientW}px`,
+);
+
+/* ---- Reduce motion must stop the looping animations, not only the flips ---- */
+await evaluate(`(() => {
+  const s = JSON.parse(localStorage.getItem("emcinemara.v1.settings") || "{}");
+  localStorage.setItem("emcinemara.v1.settings", JSON.stringify({ ...s, reduceMotion: true }));
+  return true;
+})()`);
+await S("Page.reload");
+await sleep(2200);
+const motion = JSON.parse(await evaluate(`(() => {
+  const running = [...document.querySelectorAll("*")]
+    .map((el) => getComputedStyle(el))
+    .filter((cs) => cs.animationName && cs.animationName !== "none")
+    .map((cs) => cs.animationName + ":" + cs.animationIterationCount);
+  return JSON.stringify({
+    flagged: document.documentElement.classList.contains("reduce-motion"),
+    infinite: [...new Set(running.filter((r) => r.endsWith("infinite")))],
+    any: [...new Set(running)],
+  });
+})()`));
+check("the reduce-motion setting reaches the stylesheet", motion.flagged === true);
+check(
+  "no animation keeps looping under reduce motion",
+  motion.infinite.length === 0,
+  motion.infinite.join(", "),
+);
+check("no animation runs at all under reduce motion", motion.any.length === 0, motion.any.join(", "));
 
 /* ---- 8. theme actually applied ---- */
 const theme = await evaluate(`JSON.stringify({

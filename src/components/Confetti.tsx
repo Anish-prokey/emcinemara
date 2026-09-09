@@ -10,6 +10,9 @@ import { useEffect, useRef } from "react";
  *
  * Silent for anyone who asked for reduced motion, and it removes itself once
  * the last piece falls, so nothing keeps animating behind the reveal card.
+ *
+ * `intensity` scales the burst with the quality of the win, so a first-guess
+ * solve is visibly a bigger event than a tenth-guess scrape.
  */
 
 const COLOURS = ["#e50914", "#ff5a63", "#ffffff", "#e8b923", "#46d369"];
@@ -23,14 +26,22 @@ type Piece = {
   colour: string;
 };
 
-export default function Confetti({ reduceMotion = false }: { reduceMotion?: boolean }) {
+export default function Confetti({
+  reduceMotion = false,
+  intensity = 1,
+}: {
+  reduceMotion?: boolean;
+  /** 0-1. Scales piece count and launch power. */
+  intensity?: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
 
+  const silent =
+    reduceMotion ||
+    (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+
   useEffect(() => {
-    if (reduceMotion) return;
-    if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return;
-    }
+    if (silent) return;
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -39,8 +50,16 @@ export default function Confetti({ reduceMotion = false }: { reduceMotion?: bool
     let w = 0;
     let h = 0;
     const resize = () => {
-      w = canvas.clientWidth;
-      h = canvas.clientHeight;
+      // Sized in pixels from clientWidth/clientHeight, which exclude a
+      // classic scrollbar, rather than from a CSS 100%. Belt and braces: a
+      // percentage on a fixed element is measured against the initial
+      // containing block, and if anything else on the page ever overflows
+      // horizontally that block can grow with it, dragging the burst wider
+      // than the window.
+      w = document.documentElement.clientWidth;
+      h = document.documentElement.clientHeight;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -60,11 +79,14 @@ export default function Confetti({ reduceMotion = false }: { reduceMotion?: bool
         colour: COLOURS[(Math.random() * COLOURS.length) | 0],
       });
 
-    for (let i = 0; i < 55; i++) {
-      push(0, h * 0.35, 3 + Math.random() * 6, -7 + Math.random() * 5);
-      push(w, h * 0.35, -(3 + Math.random() * 6), -7 + Math.random() * 5);
+    const k = Math.max(0.3, Math.min(1, intensity));
+    const power = 0.75 + k * 0.45;
+
+    for (let i = 0; i < Math.round(55 * k); i++) {
+      push(0, h * 0.35, (3 + Math.random() * 6) * power, (-7 + Math.random() * 5) * power);
+      push(w, h * 0.35, -(3 + Math.random() * 6) * power, (-7 + Math.random() * 5) * power);
     }
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < Math.round(40 * k); i++) {
       push(Math.random() * w, -20 - Math.random() * 60, (Math.random() - 0.5) * 2, 1 + Math.random() * 2);
     }
 
@@ -109,15 +131,20 @@ export default function Confetti({ reduceMotion = false }: { reduceMotion?: bool
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [reduceMotion]);
+  }, [silent, intensity]);
+
+  // Nothing in the DOM at all when motion is off, rather than an invisible
+  // full-screen element sitting over the board.
+  if (silent) return null;
 
   return (
     <canvas
       ref={ref}
       aria-hidden
-      // A canvas is a replaced element: inset-0 alone leaves it at its
-      // intrinsic 300x150, so the size has to be stated.
-      className="pointer-events-none fixed inset-0 z-[60] size-full"
+      // Width and height come from the effect above, in pixels. A canvas is a
+      // replaced element, so without an explicit size inset-0 would leave it at
+      // its intrinsic 300x150.
+      className="pointer-events-none fixed top-0 left-0 z-[60]"
     />
   );
 }

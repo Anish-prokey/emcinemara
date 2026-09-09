@@ -4,3 +4,9 @@ dist/
 .e2e-profile/
 .vercel/
 .netlify/
+
+# Secrets. The Pages workflow needs a public repo, so anything committed here
+# is world-readable the moment it is pushed. Keys live in .env, which never is.
+.env
+.env.*
+!.env.example

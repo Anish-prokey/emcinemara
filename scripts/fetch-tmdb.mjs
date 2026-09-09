@@ -35,7 +35,37 @@ const OUT = resolve(process.cwd(), arg("out", "src/data/movies.json"));
 /** The five industries the game ships. Adding one here also needs a matching
  *  entry in src/lib/lang.ts and src/lib/types.ts LangCode. */
 const LANGS = ["hi", "ta", "te", "ml", "kn"];
-const BASE = "https://api.themoviedb.org/3";
+/**
+ * TMDB answers on two hostnames. Several Indian ISPs block api.themoviedb.org
+ * outright while leaving api.tmdb.org and the image CDN reachable, so probe the
+ * canonical one and fall back rather than failing with "fetch failed" and no
+ * explanation. Override with TMDB_HOST if you know which one you need.
+ */
+const HOSTS = ["https://api.themoviedb.org/3", "https://api.tmdb.org/3"];
+let BASE = process.env.TMDB_HOST || HOSTS[0];
+
+async function pickHost() {
+  if (process.env.TMDB_HOST) return;
+  for (const host of HOSTS) {
+    try {
+      const probe = new URL(host + "/configuration");
+      if (!IS_TOKEN) probe.searchParams.set("api_key", KEY);
+      const res = await fetch(probe, {
+        headers: IS_TOKEN ? { Authorization: `Bearer ${KEY}`, accept: "application/json" } : {},
+        signal: AbortSignal.timeout(12000),
+      });
+      if (res.ok) {
+        BASE = host;
+        if (host !== HOSTS[0]) console.log(`note: ${HOSTS[0]} unreachable, using ${host}`);
+        return;
+      }
+      if (res.status === 401) throw new Error("TMDB rejected the key (401). Check TMDB_KEY.");
+    } catch (e) {
+      if (String(e.message).includes("401")) throw e;
+    }
+  }
+  throw new Error("Could not reach TMDB on either hostname. Check your connection.");
+}
 
 /* ------------------------------------------------------------------ */
 
@@ -125,6 +155,8 @@ async function discover(lang) {
 }
 
 async function main() {
+  await pickHost();
+
   const idsByLang = {};
   for (const lang of LANGS) {
     process.stdout.write(`discover ${lang} ... `);

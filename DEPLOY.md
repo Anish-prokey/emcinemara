@@ -43,17 +43,22 @@ Either way the settings are:
 
 ### GitHub Pages
 
-Already wired: `.github/workflows/deploy.yml` builds and deploys on every push
-to `master`, and works out the base path from the repo name itself, so nothing
-needs editing if you rename the repo.
+Live at <https://anish-prokey.github.io/emcinemara/>.
 
-Two things to know:
+Already wired: `.github/workflows/deploy.yml` builds and deploys on every push
+to `main` or `master`, and works out the base path from the repo name itself,
+so nothing needs editing if you rename the repo.
+
+Three things to know, in the order they bite:
 
 - **A free GitHub account can only serve Pages from a public repo.** Private
   repos need a paid plan.
 - After the first push, go to **Settings -> Pages** and set **Source** to
-  **GitHub Actions**. The workflow cannot do this for you. Your site then lands
-  at `https://<user>.github.io/<repo>/`.
+  **GitHub Actions**. The workflow cannot do this for you, and until it is set
+  the build succeeds while only the final `deploy-pages` step fails.
+- **Turning that setting on does not deploy anything.** It only grants
+  permission. The last run still shows its old failure, so re-run it from the
+  Actions tab, or push again. This is the step people miss.
 
 If you ever build for Pages by hand on Windows, Git Bash rewrites a leading
 slash into a Windows path and silently produces broken asset URLs

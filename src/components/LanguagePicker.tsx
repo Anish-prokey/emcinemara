@@ -20,8 +20,6 @@ export default function LanguagePicker({
         <div className="fade-up mb-10 text-center">
           <Wordmark className="text-3xl leading-none sm:text-5xl" />
           <p className="mt-2 text-[11px] tracking-[0.18em] text-[#6d6d6d] uppercase">
-            <span lang="te">ఏం సినిమా రా</span>
-            <span className="mx-1.5 text-[#4a4a4a]">/</span>
             what movie?
           </p>
           <h1 className="mt-8 text-3xl font-normal text-white sm:text-5xl">

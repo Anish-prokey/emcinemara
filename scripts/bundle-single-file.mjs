@@ -32,7 +32,7 @@ const favicon = readFileSync(join(DIST, "favicon.svg"), "utf8");
 const titleFlag = process.argv.find((a) => a.startsWith("--title="));
 const title = titleFlag
   ? titleFlag.slice("--title=".length)
-  : (html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "Emcinemara");
+  : (html.match(/<title>([^<]*)<\/title>/)?.[1] ?? "EmCinemaRa");
 const fontLink =
   html.match(/<link href="https:\/\/fonts\.googleapis\.com[^>]*>/)?.[0] ?? "";
 

@@ -30,6 +30,7 @@ import Ident from "./components/Ident";
 import { shouldPlayIdent } from "./lib/ident";
 import { PROFILE } from "./lib/profiles";
 import ClueLegend from "./components/ClueLegend";
+import Wordmark from "./components/Wordmark";
 import { HelpIcon, ArchiveIcon, StatsIcon, SettingsIcon } from "./components/icons";
 
 type ModalId = "how" | "stats" | "archive" | "settings" | null;
@@ -179,7 +180,7 @@ export default function App() {
             title="Back to today"
             className="text-left transition-transform hover:scale-[1.04]"
           >
-            <span className="wordmark text-lg leading-none sm:text-3xl">EMCINEMARA</span>
+            <Wordmark className="text-lg leading-none sm:text-3xl" />
           </button>
 
           <div className="flex items-center gap-1.5">

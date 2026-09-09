@@ -2,6 +2,7 @@ import type { LangCode } from "../lib/types";
 import { LANGS, PLAYABLE } from "../lib/lang";
 import { poolSize } from "../lib/puzzle";
 import { PROFILE } from "../lib/profiles";
+import Wordmark from "./Wordmark";
 
 export default function LanguagePicker({
   current,
@@ -17,7 +18,12 @@ export default function LanguagePicker({
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black">
       <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-12">
         <div className="fade-up mb-10 text-center">
-          <div className="wordmark text-3xl leading-none sm:text-5xl">EMCINEMARA</div>
+          <Wordmark className="text-3xl leading-none sm:text-5xl" />
+          <p className="mt-2 text-[11px] tracking-[0.18em] text-[#6d6d6d] uppercase">
+            <span lang="te">ఏం సినిమా రా</span>
+            <span className="mx-1.5 text-[#4a4a4a]">/</span>
+            what movie?
+          </p>
           <h1 className="mt-8 text-3xl font-normal text-white sm:text-5xl">
             Who&rsquo;s watching?
           </h1>

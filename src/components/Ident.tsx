@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { markIdentShown } from "../lib/ident";
+import Wordmark from "./Wordmark";
 
 /**
  * The opener: red light-bars rack up behind the wordmark, the letters wipe in,
@@ -58,8 +59,8 @@ export default function Ident({ onDone }: { onDone: () => void }) {
       {/* the blowout flash at the moment the letters land */}
       <div className="ident-flash pointer-events-none absolute inset-0 bg-[radial-gradient(50%_40%_at_50%_50%,rgba(255,60,70,.9),transparent_70%)]" />
 
-      <h1 className="ident-word wordmark relative z-10 text-[clamp(1.6rem,8vw,6rem)] leading-none">
-        EMCINEMARA
+      <h1 className="ident-word relative z-10 leading-none">
+        <Wordmark className="text-[clamp(1.5rem,7.5vw,5.5rem)]" />
       </h1>
 
       <p className="absolute bottom-10 text-[11px] tracking-[0.35em] text-[var(--color-muted)] uppercase">

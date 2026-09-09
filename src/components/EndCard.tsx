@@ -33,7 +33,7 @@ export default function EndCard({
 
   const scoreLine = won ? `${comparisons.length}/${MAX_GUESSES}` : `X/${MAX_GUESSES}`;
   const text =
-    `Emcinemara ${LANGS[lang].name} #${puzzleNum} ${scoreLine}\n` +
+    `EmCinemaRa ${LANGS[lang].name} #${puzzleNum} ${scoreLine}\n` +
     comparisons.map(shareRow).join("\n") +
     `\n${location.origin}`;
 

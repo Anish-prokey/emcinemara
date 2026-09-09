@@ -23,7 +23,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # GitHub is retiring Node 20 on its runners.
+          node-version: 22
           cache: npm
 
       - run: npm ci

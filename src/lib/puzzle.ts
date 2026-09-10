@@ -70,7 +70,15 @@ function seedFor(lang: LangCode): number {
  */
 const SCHEDULES: Record<LangCode, Movie[]> = Object.fromEntries(
   PLAYABLE.map((lang) => {
-    const pool = ALL_MOVIES.filter((m) => m.lang === lang)
+    const pool = ALL_MOVIES.filter(
+      (m) =>
+        m.lang === lang &&
+        // A film with neither artwork nor a synopsis can offer no help at all,
+        // which makes for a puzzle you can only brute-force. There are only a
+        // couple of them and thousands of alternatives, so they stay searchable
+        // as guesses but never become the answer.
+        (Boolean(m.poster || m.backdrop) || Boolean(m.overview && m.overview.length >= 40)),
+    )
       .sort((a, b) => b.votes - a.votes)
       .slice(0, ANSWER_POOL_SIZE);
     const rnd = mulberry32(seedFor(lang));

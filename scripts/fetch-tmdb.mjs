@@ -217,7 +217,11 @@ async function main() {
         cast,
         runtime: d.runtime || undefined,
         poster: d.poster_path ?? null,
-        popularity: Math.round((d.popularity ?? 0) * 10) / 10,
+        // Both come back in the /movie call already made; they feed the
+        // in-game hints. The overview is stored raw and redacted at display
+        // time, so the redaction rules can be fixed without a refetch.
+        backdrop: d.backdrop_path ?? null,
+        overview: (d.overview ?? "").trim() || undefined,
       });
     }
 

@@ -31,6 +31,8 @@ import { shouldPlayIdent } from "./lib/ident";
 import { PROFILE } from "./lib/profiles";
 import ClueLegend from "./components/ClueLegend";
 import Confetti from "./components/Confetti";
+import HintPanel from "./components/HintPanel";
+import { usedAnyHint } from "./lib/hints";
 import Wordmark from "./components/Wordmark";
 import {
   HelpIcon,
@@ -172,6 +174,7 @@ export default function App() {
     const won = m.id === answer.id;
     const lost = !won && nextGuesses.length >= MAX_GUESSES;
     const next: GameState = {
+      ...game,
       day,
       lang,
       guesses: nextGuesses,
@@ -226,6 +229,22 @@ export default function App() {
     if (won) setTimeout(() => sfx.win(gradeFor(comparisons.length + 1).reach), (settled + 0.3) * 1000);
     else if (lost) setTimeout(() => sfx.lose(), (settled + 0.3) * 1000);
     else if (remainingAfter <= 2) sfx.tension(settled + 0.55);
+  }
+
+  /** Hints are part of the board: saved, restored on reload, shown on the result. */
+  function takeHint(which: "frame" | "plot") {
+    if (!game || over) return;
+    const at = game.guesses.length;
+    const next: GameState = {
+      ...game,
+      hints: {
+        ...(game.hints ?? {}),
+        ...(which === "frame" ? { frameAt: at } : { plotAt: at }),
+      },
+    };
+    setGame(next);
+    saveGame(next);
+    sfx.hint();
   }
 
   function switchLanguage(l: LangCode) {
@@ -356,6 +375,8 @@ export default function App() {
 
         <ClueLegend onOpenHelp={() => setModal("how")} />
 
+        <HintPanel game={game} answer={answer} onTake={takeHint} animate={animate} />
+
         {/* Only for a win that just happened: reloading a finished board must
             not re-throw confetti at a puzzle solved days ago. Rendered outside
             EndCard, whose entry animation would otherwise clip it. */}
@@ -377,6 +398,7 @@ export default function App() {
             onStats={() => setModal("stats")}
             streak={isToday ? stats.streak : 0}
             milestone={milestone}
+            usedHint={usedAnyHint(game)}
             animate={animate && flash !== null}
           />
         )}

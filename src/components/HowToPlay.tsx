@@ -2,6 +2,7 @@ import type { LangCode } from "../lib/types";
 import { MAX_GUESSES } from "../lib/puzzle";
 import { LANGS } from "../lib/lang";
 import { DATA_SOURCE } from "../data/movies";
+import { FRAME_AT } from "../lib/hints";
 
 function Swatch({ cls, children }: { cls: string; children: string }) {
   return (
@@ -52,6 +53,19 @@ export default function HowToPlay({ lang }: { lang: LangCode }) {
           </Row>
           <Row k="Genres">Up to five. Each genre lights up green if the answer has it too.</Row>
         </ul>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="display text-lg text-[var(--color-fg)]">If you get stuck</h3>
+        <p>
+          After <strong>{FRAME_AT} guesses</strong> you can ask for a still from the film. It
+          arrives heavily pixelated and sharpens with every guess you make after that. Three guesses later you can also ask for the plot, with the title, cast and crew
+          blacked out.
+        </p>
+        <p className="text-[var(--color-muted)]">
+          Neither is forced on you and neither costs a guess — but a result solved with help says
+          so when you share it.
+        </p>
       </div>
 
       <p className="text-[var(--color-muted)]">

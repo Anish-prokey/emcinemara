@@ -13,7 +13,12 @@ export type Movie = {
   cast: string[];         // [lead, ...up to 4 supporting]
   runtime?: number;       // minutes; only present once TMDB data is loaded
   poster?: string | null;
-  popularity?: number;
+  /** A still from the film, for the frame hint. TMDB path, same shape as poster. */
+  backdrop?: string | null;
+  /** Raw plot summary. Never shown as-is — see redactPlot(). */
+  overview?: string;
+  /** Character names that appear in `overview`, so they can be redacted too. */
+  characters?: string[];
 };
 
 /** The five industries the game ships. Each one runs its own daily puzzle. */
@@ -49,6 +54,8 @@ export type GameState = {
   lang: LangCode;
   guesses: number[];    // movie ids in order
   status: GameStatus;
+  /** Which hints were taken, and after how many guesses. Absent on older saves. */
+  hints?: { frameAt?: number; plotAt?: number };
 };
 
 export type Stats = {

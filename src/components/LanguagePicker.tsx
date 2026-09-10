@@ -1,6 +1,5 @@
 import type { LangCode } from "../lib/types";
 import { LANGS, PLAYABLE } from "../lib/lang";
-import { poolSize } from "../lib/puzzle";
 import { PROFILE } from "../lib/profiles";
 import Wordmark from "./Wordmark";
 
@@ -36,7 +35,6 @@ export default function LanguagePicker({
         <ul className="flex flex-wrap justify-center gap-4 sm:gap-6">
           {PLAYABLE.map((code, i) => {
             const l = LANGS[code];
-            const n = poolSize(code);
             const isCurrent = code === current;
             return (
               <li key={code} className="fade-up" style={{ animationDelay: `${120 + i * 70}ms` }}>
@@ -64,7 +62,7 @@ export default function LanguagePicker({
                     {l.name}
                   </span>
                   <span className="mt-0.5 block text-[11px] text-[#6d6d6d]">
-                    {l.industry} · {n} film{n === 1 ? "" : "s"}
+                    {l.industry}
                   </span>
                 </button>
               </li>

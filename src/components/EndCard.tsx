@@ -18,6 +18,7 @@ export default function EndCard({
   streak,
   milestone,
   animate,
+  usedHint,
 }: {
   won: boolean;
   answer: Movie;
@@ -30,6 +31,8 @@ export default function EndCard({
   /** Set only when this win crossed a milestone, so it is worth shouting about. */
   milestone: number | null;
   animate: boolean;
+  /** Whether any hint was taken, which the shared result declares. */
+  usedHint: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [left, setLeft] = useState(msUntilNextPuzzle());
@@ -48,6 +51,9 @@ export default function EndCard({
     // the grid rather than staying locked inside the app.
     (grade ? ` · ${grade.title}` : "") +
     (streak > 1 ? ` · ${streak}-day streak` : "") +
+    // Owned up to rather than hidden: a hinted solve and a cold one are not
+    // the same result, and the grid alone cannot tell them apart.
+    (usedHint ? " · with a hint" : "") +
     "\n" +
     comparisons.map(shareRow).join("\n") +
     `\n${location.origin}`;

@@ -334,6 +334,76 @@ async function guessAnything(seed) {
   })()`);
 }
 
+/* ---- hints: offered late, taken by choice, and they stay taken ---- */
+const hintEarly = await evaluate(
+  `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent))`,
+);
+check("no hint is offered early on", hintEarly === false);
+
+// Walk up to the gate.
+const LETTERS_H = "aeiorn".split("");
+for (let i = 0; i < 6; i++) {
+  const used = await evaluate(`(() => {
+    const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
+    return k ? JSON.parse(localStorage.getItem(k)).guesses.length : 0;
+  })()`);
+  if (used >= 4) break;
+  await guessAnything(LETTERS_H[i]);
+  await sleep(260);
+}
+
+const frameOffered = await evaluate(
+  `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent))`,
+);
+check("artwork is offered once the board stops helping", frameOffered === true);
+
+await evaluate(`(() => {
+  const b = [...document.querySelectorAll("button")].find(x => /Show me the poster/.test(x.textContent));
+  if (b) b.click();
+  return true;
+})()`);
+await sleep(1400);
+
+const framed = JSON.parse(await evaluate(`(() => {
+  const c = document.querySelector("figure canvas");
+  const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
+  const g = k ? JSON.parse(localStorage.getItem(k)) : {};
+  return JSON.stringify({
+    canvas: Boolean(c),
+    painted: c ? c.width > 0 && c.height > 0 : false,
+    saved: g.hints ? g.hints.frameAt : null,
+    caption: document.querySelector("figcaption")?.textContent ?? "",
+  });
+})()`));
+check("taking it draws the poster", framed.canvas && framed.painted, JSON.stringify(framed));
+check("the hint is recorded on the board", framed.saved !== null && framed.saved !== undefined);
+check("the artwork says it will sharpen", framed.caption.includes("1/"), framed.caption);
+
+// The bug this guards: submit() used to rebuild the board and drop `hints`,
+// so the frame vanished on the very next guess.
+await guessAnything("s");
+await sleep(700);
+const afterGuess = JSON.parse(await evaluate(`(() => {
+  const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
+  const g = k ? JSON.parse(localStorage.getItem(k)) : {};
+  return JSON.stringify({
+    stillThere: Boolean(document.querySelector("figure canvas")),
+    saved: g.hints ? g.hints.frameAt : null,
+    caption: document.querySelector("figcaption")?.textContent ?? "",
+  });
+})()`));
+check("guessing again does not wipe the hint", afterGuess.stillThere === true, JSON.stringify(afterGuess));
+check("the hint survives in storage", afterGuess.saved !== null && afterGuess.saved !== undefined);
+check("the artwork sharpened by one step", afterGuess.caption.includes("2/"), afterGuess.caption);
+
+// And it must come back after a reload, like the rest of the board.
+await S("Page.reload");
+await sleep(2200);
+check(
+  "the hint is still there after a reload",
+  (await evaluate(`Boolean(document.querySelector("figure canvas"))`)) === true,
+);
+
 const LETTERS = "aeiorntslumk".split("");
 for (let i = 0; i < 12; i++) {
   const done = await evaluate(`document.querySelector('input[aria-label="Search for a movie"]').disabled`);
@@ -392,6 +462,33 @@ check(
   `overflow ${winState.overflow}px`,
 );
 check("the win card reports the streak", winState.streakLine === true);
+
+/* A hint taken and then immediately solved used to stay frozen at its coarsest
+   forever, so you never got to see what you had been squinting at. Replay the
+   same win with the frame already taken and check it resolves. */
+await evaluate(`(() => {
+  const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
+  if (!k) return false;
+  const g = JSON.parse(localStorage.getItem(k));
+  g.hints = { frameAt: 0 };
+  localStorage.setItem(k, JSON.stringify(g));
+  return true;
+})()`);
+await S("Page.reload");
+await sleep(2400);
+const revealed = JSON.parse(await evaluate(`(() => {
+  const c = document.querySelector("figure canvas");
+  return JSON.stringify({
+    canvas: Boolean(c),
+    caption: document.querySelector("figcaption")?.textContent ?? "",
+  });
+})()`));
+check("a finished board still shows the hint it was given", revealed.canvas === true);
+check(
+  "and the still is revealed rather than left pixelated",
+  /Revealed/.test(revealed.caption),
+  revealed.caption,
+);
 
 /* The same 390px width, but as a narrow desktop rather than a phone.
    This is not redundant: emulated mobile gets overlay scrollbars, so the page

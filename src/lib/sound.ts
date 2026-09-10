@@ -190,3 +190,9 @@ export function milestone() {
     tone({ freq: f, dur: 0.5, type: "sine", gain: 0.2, at: 0.5 + i * 0.09 }),
   );
 }
+
+/** Taking a hint: a soft shutter, deliberately unglamorous — it is help, not a win. */
+export function hint() {
+  tone({ freq: 520, dur: 0.09, type: "triangle", gain: 0.18 });
+  tone({ freq: 350, dur: 0.14, type: "sine", gain: 0.16, at: 0.07 });
+}

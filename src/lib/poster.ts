@@ -21,3 +21,17 @@ export function posterUrl(m: Movie, size: PosterSize = "w342"): string | null {
   if (p.startsWith("data:") || /^https?:\/\//.test(p)) return p;
   return `${TMDB_IMAGE_BASE}/${size}${p.startsWith("/") ? "" : "/"}${p}`;
 }
+
+/** TMDB backdrop widths. w780 is plenty for a still that starts out pixelated. */
+export type BackdropSize = "w300" | "w780" | "w1280";
+
+/**
+ * Resolve a film's still. Same passthrough rules as posterUrl, so a mirrored or
+ * inlined build needs no change here either.
+ */
+export function backdropUrl(m: Movie, size: BackdropSize = "w780"): string | null {
+  const b = m.backdrop;
+  if (!b) return null;
+  if (b.startsWith("data:") || /^https?:\/\//.test(b)) return b;
+  return `${TMDB_IMAGE_BASE}/${size}${b.startsWith("/") ? "" : "/"}${b}`;
+}

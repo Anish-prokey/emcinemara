@@ -1,8 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="10" fill="#000"/>
-  <g fill="#e50914">
-    <rect x="17" y="10" width="9" height="44"/>
-    <rect x="38" y="10" width="9" height="44"/>
-    <path d="M17 10h10l20 44H37z"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Em Cinema Ra">
+  <!--
+    The mark is a question mark because the name is one: Em Cinema Ra is Telugu
+    for "what movie?", which is exactly what the game asks.
+
+    White on the brand red rather than red on black. At 16px, which is the only
+    size that really matters for a favicon, a red mark on a dark ground loses
+    its shape and sinks into a dark browser tab; a white mark on a red ground
+    holds up on light and dark tab bars alike.
+  -->
+  <rect width="64" height="64" rx="12" fill="#e50914" />
+  <path
+    d="M22 25a10 10 0 1 1 10 9.8V39"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="8.5"
+    stroke-linecap="round"
+  />
+  <circle cx="32" cy="49" r="4.8" fill="#ffffff" />
 </svg>

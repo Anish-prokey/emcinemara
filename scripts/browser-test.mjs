@@ -334,11 +334,37 @@ async function guessAnything(seed) {
   })()`);
 }
 
-/* ---- hints: offered late, taken by choice, and they stay taken ---- */
-const hintEarly = await evaluate(
-  `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent))`,
+/* ---- hints: offered late, taken by choice, and they stay taken ----
+
+   They live behind a dialog now, so every step here goes through the bar on the
+   board rather than clicking a button that sits in the page. */
+
+/** Open the zoom dialog by clicking the poster thumbnail on the board. */
+async function openHints() {
+  await evaluate(`(() => {
+    const c = document.querySelector("main canvas");
+    const b = c && c.closest("button");
+    if (!b) return false;
+    b.click();
+    return true;
+  })()`);
+  await sleep(450);
+  return evaluate(`Boolean(document.querySelector('[role="dialog"]'))`);
+}
+
+async function closeHints() {
+  await evaluate(`(() => {
+    const b = document.querySelector('[role="dialog"] button[aria-label="Close"]');
+    if (b) b.click();
+    return true;
+  })()`);
+  await sleep(350);
+}
+
+const barEarly = await evaluate(
+  `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent || ""))`,
 );
-check("no hint is offered early on", hintEarly === false);
+check("no hint is offered early on", barEarly === false);
 
 // Walk up to the gate.
 const LETTERS_H = "aeiorn".split("");
@@ -352,57 +378,78 @@ for (let i = 0; i < 6; i++) {
   await sleep(260);
 }
 
-const frameOffered = await evaluate(
-  `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent))`,
+check(
+  "a hint is offered once the board stops helping",
+  (await evaluate(
+    `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent || ""))`,
+  )) === true,
 );
-check("artwork is offered once the board stops helping", frameOffered === true);
+check(
+  "the board shows no artwork until asked",
+  (await evaluate(`Boolean(document.querySelector("main canvas"))`)) === false,
+);
 
+// Taken straight from the board, with no dialog in the way.
 await evaluate(`(() => {
-  const b = [...document.querySelectorAll("button")].find(x => /Show me the poster/.test(x.textContent));
+  const b = [...document.querySelectorAll("button")]
+    .find((x) => /Show me the poster/.test(x.textContent || ""));
   if (b) b.click();
   return true;
 })()`);
 await sleep(1400);
 
+const STEP_RE = 'new RegExp("Poster [0-9]+" + String.fromCharCode(47) + "[0-9]+")';
 const framed = JSON.parse(await evaluate(`(() => {
-  const c = document.querySelector("figure canvas");
+  const c = document.querySelector("main canvas");
   const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
   const g = k ? JSON.parse(localStorage.getItem(k)) : {};
+  const m = document.body.innerText.match(${STEP_RE});
   return JSON.stringify({
     canvas: Boolean(c),
     painted: c ? c.width > 0 && c.height > 0 : false,
     saved: g.hints ? g.hints.frameAt : null,
-    caption: document.querySelector("figcaption")?.textContent ?? "",
+    status: m ? m[0] : "",
   });
 })()`));
-check("taking it draws the poster", framed.canvas && framed.painted, JSON.stringify(framed));
+check("taking it draws the poster on the board", framed.canvas && framed.painted, JSON.stringify(framed));
 check("the hint is recorded on the board", framed.saved !== null && framed.saved !== undefined);
-check("the artwork says it will sharpen", framed.caption.includes("1/"), framed.caption);
+check("the board reports which step it is at", framed.status.indexOf("1") > -1, framed.status);
+
+check("the thumbnail opens a bigger view", (await openHints()) === true);
+check(
+  "the dialog shows the same poster",
+  (await evaluate(`Boolean(document.querySelector('[role="dialog"] figure canvas'))`)) === true,
+);
+await closeHints();
 
 // The bug this guards: submit() used to rebuild the board and drop `hints`,
-// so the frame vanished on the very next guess.
+// so the poster vanished on the very next guess.
 await guessAnything("s");
 await sleep(700);
 const afterGuess = JSON.parse(await evaluate(`(() => {
   const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
   const g = k ? JSON.parse(localStorage.getItem(k)) : {};
+  const m = document.body.innerText.match(${STEP_RE});
   return JSON.stringify({
-    stillThere: Boolean(document.querySelector("figure canvas")),
+    stillThere: Boolean(document.querySelector("main canvas")),
     saved: g.hints ? g.hints.frameAt : null,
-    caption: document.querySelector("figcaption")?.textContent ?? "",
+    status: m ? m[0] : "",
   });
 })()`));
 check("guessing again does not wipe the hint", afterGuess.stillThere === true, JSON.stringify(afterGuess));
 check("the hint survives in storage", afterGuess.saved !== null && afterGuess.saved !== undefined);
-check("the artwork sharpened by one step", afterGuess.caption.includes("2/"), afterGuess.caption);
+// The whole point of putting it back on the board: it updates where it stands,
+// with nothing to open.
+check("it sharpens in place, with nothing to open", afterGuess.status.indexOf("2") > -1, afterGuess.status);
 
 // And it must come back after a reload, like the rest of the board.
 await S("Page.reload");
 await sleep(2200);
 check(
   "the hint is still there after a reload",
-  (await evaluate(`Boolean(document.querySelector("figure canvas"))`)) === true,
+  (await evaluate(`Boolean(document.querySelector("main canvas"))`)) === true,
 );
+
 
 const LETTERS = "aeiorntslumk".split("");
 for (let i = 0; i < 12; i++) {
@@ -477,18 +524,17 @@ await evaluate(`(() => {
 await S("Page.reload");
 await sleep(2400);
 const revealed = JSON.parse(await evaluate(`(() => {
-  const c = document.querySelector("figure canvas");
-  return JSON.stringify({
-    canvas: Boolean(c),
-    caption: document.querySelector("figcaption")?.textContent ?? "",
-  });
+  const c = document.querySelector("main canvas");
+  const m = document.body.innerText.match(/Revealed/);
+  return JSON.stringify({ canvas: Boolean(c), caption: m ? m[0] : "" });
 })()`));
 check("a finished board still shows the hint it was given", revealed.canvas === true);
 check(
-  "and the still is revealed rather than left pixelated",
+  "and the poster is revealed rather than left pixelated",
   /Revealed/.test(revealed.caption),
   revealed.caption,
 );
+
 
 /* The same 390px width, but as a narrow desktop rather than a phone.
    This is not redundant: emulated mobile gets overlay scrollbars, so the page

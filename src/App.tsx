@@ -31,7 +31,7 @@ import { shouldPlayIdent } from "./lib/ident";
 import { PROFILE } from "./lib/profiles";
 import ClueLegend from "./components/ClueLegend";
 import Confetti from "./components/Confetti";
-import HintPanel from "./components/HintPanel";
+import HintPanel, { HintBar } from "./components/HintPanel";
 import { usedAnyHint } from "./lib/hints";
 import Wordmark from "./components/Wordmark";
 import {
@@ -47,7 +47,7 @@ import { readings, type HeatReading } from "./lib/heat";
 import { gradeFor, isMilestone } from "./lib/grade";
 import * as sfx from "./lib/sound";
 
-type ModalId = "how" | "stats" | "archive" | "settings" | null;
+type ModalId = "how" | "stats" | "archive" | "settings" | "hints" | null;
 
 function initialDay(): string {
   const p = new URLSearchParams(location.search).get("d");
@@ -375,7 +375,13 @@ export default function App() {
 
         <ClueLegend onOpenHelp={() => setModal("how")} />
 
-        <HintPanel game={game} answer={answer} onTake={takeHint} animate={animate} />
+        <HintBar
+          game={game}
+          answer={answer}
+          onTake={takeHint}
+          onZoom={() => setModal("hints")}
+          animate={animate}
+        />
 
         {/* Only for a win that just happened: reloading a finished board must
             not re-throw confetti at a puzzle solved days ago. Rendered outside
@@ -448,6 +454,11 @@ export default function App() {
               setModal(null);
             }}
           />
+        </Modal>
+      )}
+      {modal === "hints" && (
+        <Modal title="Your hints" onClose={closeModal}>
+          <HintPanel game={game} answer={answer} />
         </Modal>
       )}
       {modal === "settings" && (

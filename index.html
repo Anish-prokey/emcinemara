@@ -3,13 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>EmCinemaRa — Guess the Indian movie</title>
-    <meta name="description" content="Em Cinema Ra — Telugu for &quot;what movie?&quot;. A daily Indian movie guessing game: ten guesses to name the film. Hindi, Tamil, Telugu, Malayalam and Kannada, each with its own puzzle every day." />
+    <title>EmCinemaRa — Guess the movie</title>
+    <meta name="description" content="Em Cinema Ra — Telugu for &quot;what movie?&quot;. A daily movie guessing game: ten guesses to name the film. Hindi, Tamil, Telugu, Malayalam, Kannada and English, each with its own puzzle every day." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#000000" />
+
+    <!--
+      Installed-app behaviour. iOS reads none of this from the web manifest, so
+      the same intent has to be stated twice: once for everyone else in
+      manifest.webmanifest, and once here for Safari.
+
+      The status bar is opaque black rather than translucent on purpose. The
+      viewport is already viewport-fit=cover, and translucent would slide the
+      sticky header up under the notch, where nothing pads it back down.
+    -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="EmCinemaRa" />
-    <meta property="og:title" content="EmCinemaRa — Guess the Indian movie" />
-    <meta property="og:description" content="Ten guesses to name the film of the day. Five industries, five puzzles, every day." />
+    <meta property="og:title" content="EmCinemaRa — Guess the movie" />
+    <meta property="og:description" content="Ten guesses to name the film of the day. Six industries, six puzzles, every day." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />

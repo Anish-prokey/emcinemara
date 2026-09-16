@@ -151,7 +151,7 @@ await goto(BASE);
 await sleep(2600); // let the ident finish
 
 const profileCount = await evaluate(`document.querySelectorAll('.nf-tile').length`);
-check("first run shows five profile tiles", profileCount === 5, `saw ${profileCount}`);
+check("first run shows all six profile tiles", profileCount === 6, `saw ${profileCount}`);
 check(
   "the opener played and marked itself",
   (await evaluate(`sessionStorage.getItem('emcinemara.identShown')`)) === "1",

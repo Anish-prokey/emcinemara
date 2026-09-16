@@ -49,6 +49,9 @@ const PLAN = {
   te: { minVotes: 8, pages: 50 },
   ml: { minVotes: 8, pages: 50 },
   kn: { minVotes: 2, pages: 40 },
+  // Hollywood: gated purely on fame. 3,000 votes keeps every answer a film most
+  // players will have heard of, and still yields about 1,800 of them.
+  en: { minVotes: 3000, pages: 100 },
 };
 
 const MUSIC_JOBS = ["Original Music Composer", "Music", "Composer", "Songs"];
@@ -145,7 +148,21 @@ async function composersFromWikidata(ids) {
 
 /* ---------------- shaping ---------------- */
 
+// US ratings, in the codes the game stores.
+const US_RATING = { G: "G", PG: "PG", "PG-13": "PG13", R: "R", "NC-17": "NC17" };
+
 function certOf(d) {
+  // English films are rated on the US scale. TMDB has an MPA rating for nearly
+  // every well-known Hollywood film but a CBFC certificate for only about half,
+  // so the Indian scale would leave the clue blank on most English days.
+  if (d.original_language === "en") {
+    const us = d.release_dates?.results?.find((r) => r.iso_3166_1 === "US");
+    for (const c of us?.release_dates ?? []) {
+      const code = US_RATING[(c.certification ?? "").trim().toUpperCase()];
+      if (code) return code;
+    }
+    return "NR";
+  }
   const rel = d.release_dates?.results?.find((r) => r.iso_3166_1 === "IN");
   for (const c of rel?.release_dates ?? []) {
     const t = (c.certification ?? "").trim().toUpperCase().replace(/\s+/g, "");

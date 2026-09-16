@@ -1,5 +1,5 @@
 import type { Movie, Comparison, Tile, Arrow } from "./types";
-import { CERT_ORDER } from "./lang";
+import { CERT_SCALES } from "./lang";
 import { CAST_ORDERED, HAS_CERTS } from "../data/movies";
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -37,8 +37,10 @@ export function compare(guess: Movie, answer: Movie, opts: CompareOptions = {}):
   const castOrdered = opts.castOrdered ?? CAST_ORDERED;
   const certs = opts.certs ?? HAS_CERTS;
 
-  const gi = CERT_ORDER.indexOf(guess.cert as never);
-  const ai = CERT_ORDER.indexOf(answer.cert as never);
+  // Adjacency only counts within the answer's own scale (CBFC or US).
+  const scale = CERT_SCALES.find((s) => s.includes(answer.cert)) ?? [];
+  const gi = scale.indexOf(guess.cert);
+  const ai = scale.indexOf(answer.cert);
   const certTile: Tile =
     guess.cert === answer.cert
       ? { state: "hit" }

@@ -1,6 +1,6 @@
 import type { LangCode } from "../lib/types";
 import { MAX_GUESSES } from "../lib/puzzle";
-import { LANGS } from "../lib/lang";
+import { LANGS, certClue } from "../lib/lang";
 import { DATA_SOURCE } from "../data/movies";
 import { FRAME_AT } from "../lib/hints";
 
@@ -43,7 +43,7 @@ export default function HowToPlay({ lang }: { lang: LangCode }) {
         <ul className="space-y-1.5">
           <Row k="Year">Release year. ▲ means the answer is later, ▼ earlier. Gold = within 5 years.</Row>
           <Row k="Rating">TMDB user rating out of 10. ▲/▼ point toward the answer. Gold = within 0.4.</Row>
-          <Row k="Certificate">CBFC certificate: U, U/A or A. Gold = one step away.</Row>
+          <Row k={certClue(lang).label}>{certClue(lang).help}</Row>
           {hasRuntime && <Row k="Runtime">How long the film runs. ▲/▼ point toward the answer. Gold = within 10 minutes.</Row>}
           <Row k="Director">Gold if that person is credited on the answer in some other role.</Row>
           <Row k="Music">The music director. Same gold rule as above.</Row>

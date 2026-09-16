@@ -6,7 +6,7 @@ telling you how close you landed.
 
 **Live:** <https://emcinemara.netlify.app>
 
-Five industries — Hindi, Tamil, Telugu, Malayalam, Kannada — each running **its own
+Six industries — Hindi, Tamil, Telugu, Malayalam, Kannada and English (Hollywood) — each running **its own
 puzzle** with its own answer and its own streak. Players pick one on first launch and
 can switch any time.
 
@@ -24,10 +24,39 @@ npm run dev
 | `npm run selftest` | logic assertions: comparison rules, per-language schedules, search |
 | `npm run browser-test` | drives a real headless Chrome — clicks, keystrokes, persistence, theme. Needs a running server; set `BASE` to test a deployed URL |
 | `npm run fetch:tmdb` | rebuild the dataset from TMDB |
+| `npm run expand` | add films to the dataset without touching the ones already there (TMDB, with Wikidata filling missing composers) |
+| `npm run enrich:tmdb` | refresh the posters, synopses and character names the hints use |
+| `npm run apk` | build the Android app — see below |
 
 `dist/` is a plain static folder. There is no backend: the daily film is derived from
 the date in the browser, and progress lives in `localStorage`. See
 [DEPLOY.md](DEPLOY.md) for hosting.
+
+## Android app
+
+The same build, wrapped by [Capacitor](https://capacitorjs.com) into a native Android
+project under `android/`. The whole game ships inside the APK, so it plays offline and
+never depends on the live site.
+
+```bash
+npm run apk
+```
+
+builds the web app, syncs it into `android/`, compiles a debug APK and leaves it at the
+repo root as `EmCinemaRa-debug.apk`. Copy it to a phone and open it — the phone has to
+allow installing apps from unknown sources.
+
+It needs **Java 21**: Capacitor 8's Android library is compiled for it and nothing older
+will build it. The script tries `ANDROID_JAVA_HOME`, then `JAVA_HOME`, then
+`E:/tools/jdk-21`; `npm run apk -- --which-java` shows what it found. Gradle's cache goes
+to `E:/tools/gradle-home` unless `GRADLE_USER_HOME` says otherwise, and the Android SDK
+comes from `ANDROID_HOME`.
+
+The service worker is web-only. Inside the app it would keep serving whatever bundle it
+had cached after an update, so `src/main.tsx` skips registering it on native.
+
+The Play Store wants a signed release bundle (`.aab`), not this debug APK. That is a
+separate step with its own signing key.
 
 ## The clues
 

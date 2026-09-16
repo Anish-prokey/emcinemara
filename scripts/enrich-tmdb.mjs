@@ -122,14 +122,18 @@ function charactersInOverview(credits, overview) {
 
 const data = JSON.parse(readFileSync(FILE, "utf8"));
 const films = data.movies;
-console.log(`enriching ${films.length} films\n`);
+// `npm run enrich:tmdb -- --lang=en` refreshes one industry instead of
+// refetching every film in the library. The prune below still covers all.
+const langArg = process.argv.find((a) => a.startsWith("--lang="))?.slice(7);
+const targets = langArg ? films.filter((m) => m.lang === langArg) : films;
+console.log(`enriching ${targets.length} films${langArg ? ` (${langArg} only)` : ""}\n`);
 
 let withStill = 0;
 let withPlot = 0;
 let failed = 0;
 
-for (let i = 0; i < films.length; i += 12) {
-  const batch = films.slice(i, i + 12);
+for (let i = 0; i < targets.length; i += 12) {
+  const batch = targets.slice(i, i + 12);
   const details = await Promise.all(batch.map((m) => detail(m.id)));
 
   batch.forEach((m, k) => {
@@ -148,7 +152,7 @@ for (let i = 0; i < films.length; i += 12) {
     if (m.overview) withPlot++;
   });
 
-  if (i % 240 < 12) process.stdout.write(`  ${Math.min(i + 12, films.length)}/${films.length}\r`);
+  if (i % 240 < 12) process.stdout.write(`  ${Math.min(i + 12, targets.length)}/${targets.length}\r`);
   await sleep(55);
 }
 
@@ -157,8 +161,8 @@ data.movies = films;
 data.enrichedAt = new Date().toISOString();
 writeFileSync(FILE, JSON.stringify(data, null, 0));
 
-const pct = (n) => `${Math.round((n / films.length) * 100)}%`;
-console.log(`\n\nstills   ${withStill}/${films.length} (${pct(withStill)})`);
-console.log(`plots    ${withPlot}/${films.length} (${pct(withPlot)})`);
+const pct = (n) => `${Math.round((n / targets.length) * 100)}%`;
+console.log(`\n\nstills   ${withStill}/${targets.length} (${pct(withStill)})`);
+console.log(`plots    ${withPlot}/${targets.length} (${pct(withPlot)})`);
 console.log(`failed   ${failed}`);
 console.log(`pruned   ${stripped} films that can never be the answer`);

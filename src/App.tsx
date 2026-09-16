@@ -34,6 +34,7 @@ import Confetti from "./components/Confetti";
 import HintPanel, { HintBar } from "./components/HintPanel";
 import { usedAnyHint } from "./lib/hints";
 import Wordmark from "./components/Wordmark";
+import InstallPrompt from "./components/InstallPrompt";
 import {
   HelpIcon,
   ArchiveIcon,
@@ -271,7 +272,9 @@ export default function App() {
     <div className="vignette min-h-full">
       {ident && <Ident onDone={() => setIdent(false)} />}
 
-      <header className="sticky top-0 z-20 bg-gradient-to-b from-black via-black/92 to-transparent backdrop-blur-[2px]">
+      {/* Padded clear of the status bar where the app is drawn edge to edge; the
+          gradient behind it covers the bar itself. */}
+      <header className="sticky top-0 z-20 pt-[var(--safe-top)] bg-gradient-to-b from-black via-black/92 to-transparent backdrop-blur-[2px]">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-2 px-2 py-3 sm:gap-3 sm:px-4">
           <button
             onClick={() => setDay(today)}
@@ -340,7 +343,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto max-w-2xl px-3 pt-3 pb-24 sm:px-4">
+      <main className="relative z-10 mx-auto max-w-2xl px-3 pt-3 pb-[calc(6rem_+_var(--safe-bottom))] sm:px-4">
         <div className="fade-up mb-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-bold tracking-[0.3em] text-[var(--color-brand)] uppercase">
@@ -374,6 +377,10 @@ export default function App() {
         </div>
 
         <ClueLegend onOpenHelp={() => setModal("how")} />
+
+        {/* Only once they have actually played a little — nobody should be
+            asked to install a game they have not tried. */}
+        <InstallPrompt ready={game.guesses.length >= 3} />
 
         <HintBar
           game={game}

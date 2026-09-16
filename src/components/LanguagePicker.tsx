@@ -14,7 +14,7 @@ export default function LanguagePicker({
   onCancel?: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black pt-[var(--safe-top)] pb-[var(--safe-bottom)]">
       <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-4 py-12">
         <div className="fade-up mb-10 text-center">
           <Wordmark className="text-3xl leading-none sm:text-5xl" />
@@ -30,9 +30,9 @@ export default function LanguagePicker({
           </p>
         </div>
 
-        {/* Sized so all five sit on one row from the small breakpoint up,
+        {/* Sized so all six sit on one row from the small breakpoint up,
             the way Netflix lays profiles out. */}
-        <ul className="flex flex-wrap justify-center gap-4 sm:gap-6">
+        <ul className="flex flex-wrap justify-center gap-4 sm:gap-5">
           {PLAYABLE.map((code, i) => {
             const l = LANGS[code];
             const isCurrent = code === current;
@@ -41,7 +41,7 @@ export default function LanguagePicker({
                 <button
                   onClick={() => onPick(code)}
                   aria-current={isCurrent || undefined}
-                  className="nf-tile block w-[6.5rem] text-center sm:w-[8.5rem]"
+                  className="nf-tile block w-[6.5rem] text-center sm:w-[7.5rem]"
                 >
                   <span
                     className="nf-avatar grid aspect-square w-full place-items-center rounded-md"

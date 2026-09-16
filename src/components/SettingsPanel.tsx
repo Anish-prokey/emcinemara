@@ -82,7 +82,7 @@ export default function SettingsPanel({
       </div>
 
       <div className="border-t border-[var(--color-line)] pt-4 text-xs text-[var(--color-muted)]">
-        {ALL_MOVIES.length} films loaded across five industries ·{" "}
+        {ALL_MOVIES.length} films loaded across every industry ·{" "}
         {DATA_SOURCE === "tmdb" ? (
           <>data from TMDB</>
         ) : (

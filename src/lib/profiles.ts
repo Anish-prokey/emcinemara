@@ -2,7 +2,7 @@ import type { LangCode } from "./types";
 
 /**
  * Profile-avatar looks, shared by the picker, the header and Settings so the
- * five industries are recognisable by colour anywhere they appear.
+ * industries are recognisable by colour anywhere they appear.
  *
  * `size` is set per language because the scripts are wildly different widths at
  * the same font size — Malayalam runs roughly three times as wide as Devanagari,
@@ -14,4 +14,5 @@ export const PROFILE: Record<LangCode, { tint: string; size: string }> = {
   te: { tint: "linear-gradient(150deg,#2f5fd0,#132a63)", size: "1.35rem" },
   ml: { tint: "linear-gradient(150deg,#c8850f,#5d3c04)", size: "1.05rem" },
   kn: { tint: "linear-gradient(150deg,#7b3fbf,#33165c)", size: "1.45rem" },
+  en: { tint: "linear-gradient(150deg,#b8326e,#4a0f2b)", size: "2rem" },
 };

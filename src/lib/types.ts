@@ -7,7 +7,7 @@ export type Movie = {
   genres: string[];       // up to 5
   director: string;
   music: string;          // music director / composer
-  cert: Cert;             // CBFC certificate
+  cert: Cert;             // CBFC certificate, or the US rating for English films
   score: number;          // TMDB vote average, 0-10
   votes: number;
   cast: string[];         // [lead, ...up to 4 supporting]
@@ -21,10 +21,11 @@ export type Movie = {
   characters?: string[];
 };
 
-/** The five industries the game ships. Each one runs its own daily puzzle. */
-export type LangCode = "hi" | "ta" | "te" | "ml" | "kn";
+/** The industries the game ships. Each one runs its own daily puzzle. */
+export type LangCode = "hi" | "ta" | "te" | "ml" | "kn" | "en";
 
-export type Cert = "U" | "UA" | "A" | "NR";
+/** CBFC certificates (U, UA, A) for Indian films; US ratings for English ones. */
+export type Cert = "U" | "UA" | "A" | "G" | "PG" | "PG13" | "R" | "NC17" | "NR";
 
 export type TileState = "hit" | "near" | "miss";
 export type Arrow = "up" | "down" | null;

@@ -82,7 +82,7 @@ export default function SearchBox({
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
           placeholder={
-            disabled ? "Puzzle complete" : `Guess a ${LANGS[lang].name} film — ${remaining} left`
+            disabled ? "Puzzle complete" : `Guess ${/^[aeiou]/i.test(LANGS[lang].name) ? "an" : "a"} ${LANGS[lang].name} film — ${remaining} left`
           }
           aria-label="Search for a movie"
           aria-autocomplete="list"

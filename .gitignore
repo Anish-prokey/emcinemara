@@ -1,5 +1,10 @@
 node_modules/
 dist/
+# The dev-mode service worker vite-plugin-pwa writes for `npm run dev`.
+dev-dist/
+# Built Android packages, copied to the root by `npm run apk`.
+*.apk
+*.aab
 *.log
 .e2e-profile/
 .vercel/

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+    </style>
+
+
+    <!-- Cold-start theme only: Capacitor's BridgeActivity swaps to
+         AppTheme.NoActionBar in onCreate, and never calls installSplashScreen. -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <!-- Android 12+ draws its own splash: the launcher icon (the red tile)
+             centred on this. Black, so it flows straight into the game. -->
+        <item name="windowSplashScreenBackground">#000000</item>
+        <!-- Android 7-11 show this drawable instead until the web view is up. -->
+        <item name="android:background">@drawable/splash</item>
+    </style>
+</resources>

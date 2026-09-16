@@ -12,13 +12,13 @@ import { searchMovies } from "../src/lib/search";
 import { heatOf, readings, bandFor } from "../src/lib/heat";
 import { gradeFor, isMilestone, nextMilestone } from "../src/lib/grade";
 import {
-  hintView, redactPlot, plotWouldLeak, usedAnyHint,
+  hintView, redactPlot, plotWouldLeak, usedAnyHint, spellingKey, NOT_A_NAME,
   FRAME_AT, PLOT_AT, SHARPNESS,
 } from "../src/lib/hints";
 import type { GameState } from "../src/lib/types";
 import { ALL_MOVIES, HAS_CERTS } from "../src/data/movies";
-import { CERT_LABEL, LANGS, PLAYABLE } from "../src/lib/lang";
-import type { LangCode } from "../src/lib/types";
+import { CERT_LABEL, LANGS, PLAYABLE, certClue } from "../src/lib/lang";
+import type { Cert, LangCode } from "../src/lib/types";
 
 let failures = 0;
 function check(name: string, cond: boolean, extra = "") {
@@ -47,7 +47,7 @@ for (const m of ALL_MOVIES) {
   if (m.score < 0 || m.score > 10) { dataOk = false; console.log("  score range:", m.title); }
 }
 check("every film is well-formed", dataOk);
-check("only the five shipped industries are present", Object.keys(byLang).every((l) => PLAYABLE.includes(l as LangCode)));
+check("only the shipped industries are present", Object.keys(byLang).every((l) => PLAYABLE.includes(l as LangCode)));
 check("every industry has films", PLAYABLE.every((l) => poolSize(l) > 0), JSON.stringify(byLang));
 
 /* ---- a film compared against itself is all green ---- */
@@ -80,6 +80,28 @@ const certU = withCert("U"), certUA = withCert("UA"), certA = withCert("A");
 if (certU && certUA) check("U vs U/A is gold", compare(certU, certUA).cert?.state === "near");
 if (certU && certA) check("U vs A is grey", compare(certU, certA).cert?.state === "miss");
 if (!certU || !certUA) check("dataset carries real certificates", false, "no U/UA pair found");
+
+/* ---- US ratings, for English films only ---- */
+{
+  const rated = (cert: Cert) => ({ ...sholay, cert });
+  check("PG vs PG-13 is gold", compare(rated("PG"), rated("PG13")).cert?.state === "near");
+  check("PG vs R is grey", compare(rated("PG"), rated("R")).cert?.state === "miss");
+  check("the CBFC and US scales never count as close",
+    compare(rated("A"), rated("G")).cert?.state === "miss" &&
+      compare(rated("UA"), rated("PG")).cert?.state === "miss");
+  check("the certificate tile is renamed only for English",
+    certClue("en").label === "US rating" && certClue("hi").label === "Certificate");
+
+  const us: Cert[] = ["G", "PG", "PG13", "R", "NC17", "NR"];
+  const cbfc: Cert[] = ["U", "UA", "A", "NR"];
+  const en = ALL_MOVIES.filter((m) => m.lang === "en");
+  check("English films carry US ratings, not CBFC", en.every((m) => us.includes(m.cert)));
+  check("Indian films never carry US ratings",
+    ALL_MOVIES.filter((m) => m.lang !== "en").every((m) => cbfc.includes(m.cert)));
+  check("almost every English film has a rating",
+    en.filter((m) => m.cert !== "NR").length >= en.length * 0.9,
+    `${en.filter((m) => m.cert === "NR").length} of ${en.length} unrated`);
+}
 
 /* ---- runtime: driven by whether the loaded dataset actually has runtimes ---- */
 const stripRuntime = (m: typeof sholay) => ({ ...m, runtime: undefined });
@@ -124,7 +146,7 @@ check(
   PLAYABLE.every((l) => answerFor(l, todayKey).lang === l),
 );
 check(
-  "the five industries give five different films today",
+  "every industry gets a different film today",
   new Set(todays.map((m) => m.id)).size === PLAYABLE.length,
   todays.map((m) => m.title).join(" / "),
 );
@@ -183,7 +205,9 @@ check(
 );
 
 function byTitle(t: string) {
-  const m = ALL_MOVIES.find((x) => x.title === t);
+  // Indian films only: 27 Hollywood titles share a name with one (Joker, Drive,
+  // Rocky...), and these checks are written about the Indian film.
+  const m = ALL_MOVIES.find((x) => x.title === t && x.lang !== "en");
   if (!m) throw new Error(`seed is missing "${t}"`);
   return m;
 }
@@ -324,11 +348,16 @@ function byTitle(t: string) {
       .toLowerCase()
       .split(/[^a-z0-9]+/)
       .filter(Boolean);
-    return m.characters!.some((c) => visible.includes(c.toLowerCase()));
+    // Role words from a credit ("Captain", "Pakistani") are not names, and are
+    // deliberately left readable; only the names themselves must stay hidden.
+    return m.characters!.some((c) => !NOT_A_NAME.has(c.toLowerCase()) && visible.includes(c.toLowerCase()));
   });
   check("no offered synopsis names its characters",
     charLeak.length === 0,
-    charLeak.slice(0, 5).map((m) => `${m.title}: ${m.characters!.join("/")}`).join(", "));
+    charLeak.slice(0, 5).map((m) => {
+      const shown = redactPlot(m.overview!, m).filter((p) => !p.hidden).map((p) => p.text.toLowerCase());
+      return `${m.title}: ${m.characters!.filter((c) => !NOT_A_NAME.has(c.toLowerCase()) && shown.includes(c.toLowerCase())).join("/")}`;
+    }).join(", "));
   check("character names were actually captured for a fair share of films",
     withChars.length >= 40,
     `${withChars.length} of ${offered.length} offered films name a character`);
@@ -469,6 +498,110 @@ function byTitle(t: string) {
   check("most possible answers carry a still",
     missingStill.length <= Math.round(totalAnswers * 0.06),
     `${missingStill.length} of ${totalAnswers} missing`);
+}
+
+/* ---- a name spelled differently from the title or the credits ----
+
+   Chaarulatha's synopsis opens "Chaarulatha (also spelled as Charulatha) is a
+   2012 Indian horror film". Exact matching hid the first spelling and let the
+   second through, and 24 synopses in the answer pool leaked a name that way. */
+{
+  const same: [string, string][] = [
+    ["Chaarulatha", "Charulatha"], ["Singham", "Singam"], ["Bhaagamathie", "Bhaaghamathie"],
+    ["Babruvahana", "Babhruvahana"], ["Shabdavedhi", "Shabdavedi"], ["Nithya", "Nitya"],
+    ["Pavan", "Pawan"], ["Anant", "Ananth"], ["Siddhartha", "Siddharth"],
+    ["Pranayakadha", "Pranayakatha"], ["Nandini", "Nandhini"], ["Chethan", "Chetan"],
+  ];
+  const split = same.filter(([a, b]) => spellingKey(a) !== spellingKey(b));
+  check("variant spellings of one name share a key", split.length === 0,
+    split.map((p) => p.join("/")).join(", "));
+
+  // An edit-distance rule caught these too, and they are ordinary words.
+  const apart: [string, string][] = [
+    ["loves", "Lokesh"], ["hates", "Ratheesh"], ["changes", "Changer"],
+    ["Indian", "India"], ["officers", "Officer"],
+  ];
+  const merged = apart.filter(([a, b]) => spellingKey(a) === spellingKey(b));
+  check("ordinary words keep a key of their own", merged.length === 0,
+    merged.map((p) => p.join("/")).join(", "));
+
+  const shownOf = (title: string) => {
+    const m = ALL_MOVIES.find((x) => x.title.includes(title));
+    return m?.overview
+      ? redactPlot(m.overview, m).filter((p) => !p.hidden).map((p) => p.text).join("")
+      : null;
+  };
+  const charu = shownOf("Chaarulatha");
+  check("the reported synopsis no longer says Charulatha",
+    charu !== null && !/charulatha/i.test(charu), String(charu).slice(0, 90));
+  const kasa = shownOf("Kasaragodu");
+  check("a vowel dropped from a long name is still caught",
+    kasa !== null && !/kasargodu/i.test(kasa), String(kasa).slice(0, 90));
+
+  // The five-letter floor. At four, the t/d fold read "amid" as the composer
+  // Amit Trivedi and blacked it out of Secret Superstar's synopsis.
+  const superstar = shownOf("Secret Superstar");
+  check("an ordinary word beside a similar name stays readable",
+    superstar !== null && superstar.toLowerCase().split(/[^\p{L}]+/u).includes("amid"),
+    String(superstar).slice(0, 90));
+
+  // And the invariant over every synopsis that is actually offered.
+  const leaked = new Set<string>();
+  for (const lang of PLAYABLE) {
+    for (let i = 0; i < poolSize(lang); i++) {
+      const m = answerFor(lang, keyForDayIndex(i));
+      if (!m.overview || plotWouldLeak(m.overview, m)) continue;
+      const titleKeys = new Set(
+        [m.title, m.original ?? ""]
+          .flatMap((t) => t.split(/[^\p{L}\p{N}]+/u))
+          .filter((w) => w.length >= 4)
+          .map(spellingKey),
+      );
+      const visible = redactPlot(m.overview, m).filter((p) => !p.hidden).map((p) => p.text).join(" ");
+      const hit = visible.split(/[^\p{L}\p{N}]+/u).find((w) => w.length >= 4 && titleKeys.has(spellingKey(w)));
+      if (hit) leaked.add(`${lang}:${m.title} shows "${hit}"`);
+    }
+  }
+  check("no offered synopsis shows a title word under another spelling",
+    leaked.size === 0, [...leaked].slice(0, 5).join(", "));
+}
+
+/* ---- Sita Ramam, 14 Sept 2026: two faults in one clue ----
+
+   "Pakistani" was blacked out because TMDB credits a role as "Pakistani
+   General Mohammed Musa Khan" and every word of a credit was kept as a name.
+   And the synopsis was cut after 320 characters, which kept the opening about
+   Afreen and dropped the story of Ram and Sita altogether. */
+{
+  const m = ALL_MOVIES.find((x) => x.title === "Sita Ramam")!;
+  const shown = redactPlot(m.overview!, m).map((p) => (p.hidden ? "#" : p.text)).join("");
+  const words = shown.split(/[^A-Za-z]+/);
+  check("a nationality in a role credit is not treated as a name",
+    words.includes("Pakistani"), shown.slice(0, 90));
+  check("the synopsis reaches the actual story",
+    words.includes("letter"), shown.slice(-90));
+  check("the lead characters are still hidden",
+    !words.includes("Ram") && !words.includes("Sita") && !words.includes("Afreen"));
+
+  const pool = PLAYABLE.flatMap((lang) =>
+    ALL_MOVIES.filter((x) => x.lang === lang).sort((a, b) => b.votes - a.votes).slice(0, 150));
+  const cut = pool.filter((x) => x.overview && x.overview.length > 520);
+  check("only the longest synopses are still shortened",
+    cut.length <= Math.round(pool.length * 0.03), `${cut.length} of ${pool.length} cut`);
+}
+
+/* ---- Shrek: Hollywood credits describe as often as they name ----
+   Its credits list "Princess" and "Ogre" beside Shrek and Donkey. The first two
+   are what the characters are, and the synopsis needs them to make sense. */
+{
+  const m = ALL_MOVIES.find((x) => x.title === "Shrek" && x.lang === "en");
+  if (m?.overview) {
+    const words = redactPlot(m.overview, m).map((p) => (p.hidden ? "#" : p.text)).join("").split(/[^A-Za-z]+/);
+    check("a creature or role from the credits stays readable",
+      words.includes("ogre") && words.includes("princess"), words.join(" ").slice(0, 90));
+    check("the named characters are still hidden",
+      !words.includes("Shrek") && !words.includes("donkey"));
+  }
 }
 
 console.log(failures === 0 ? "\nall checks passed\n" : `\n${failures} check(s) failed\n`);

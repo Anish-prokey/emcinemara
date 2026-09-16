@@ -72,7 +72,7 @@ export function HintBar({
           <button
             onClick={onZoom}
             title="See it bigger"
-            className="group relative shrink-0 overflow-hidden rounded border border-[var(--color-line)] bg-black transition hover:border-[var(--color-brand)]/70"
+            className="group relative shrink-0 self-start overflow-hidden rounded border border-[var(--color-line)] bg-black transition hover:border-[var(--color-brand)]/70"
           >
             <Poster answer={answer} sharpness={v.sharpness} reveal={over} width={208} />
             <span className="absolute inset-x-0 bottom-0 bg-black/70 py-0.5 text-center text-[9px] tracking-[0.12em] text-white/70 uppercase opacity-0 transition group-hover:opacity-100">

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-Android-12 splash: the app's tile on black. Replaces Capacitor's
+     branded splash.png, whose density variants would otherwise outrank this. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/black" />
+    <item
+        android:width="96dp"
+        android:height="96dp"
+        android:drawable="@drawable/ic_mark_tile"
+        android:gravity="center" />
+</layer-list>

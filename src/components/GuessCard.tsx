@@ -1,5 +1,5 @@
 import type { Comparison } from "../lib/types";
-import { CERT_LABEL } from "../lib/lang";
+import { CERT_LABEL, certClue } from "../lib/lang";
 import Tile, { stateClass } from "./Tile";
 import Poster from "./Poster";
 import { CLUE_HELP } from "../lib/clues";
@@ -101,12 +101,12 @@ export default function GuessCard({
             />
             {c.cert && (
               <Tile
-                label="Certificate"
+                label={certClue(m.lang).label}
                 value={CERT_LABEL[m.cert]}
                 state={c.cert.state}
                 delay={d(2)}
                 animate={animate}
-                title={CLUE_HELP.Certificate}
+                title={certClue(m.lang).help}
               />
             )}
             {c.runtime && m.runtime && (

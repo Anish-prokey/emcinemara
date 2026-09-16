@@ -32,9 +32,9 @@ const PAGES = Number(arg("pages", 15));
 const MIN_VOTES = Number(arg("min-votes", 25));
 const OUT = resolve(process.cwd(), arg("out", "src/data/movies.json"));
 
-/** The five industries the game ships. Adding one here also needs a matching
+/** The industries the game ships. Adding one here also needs a matching
  *  entry in src/lib/lang.ts and src/lib/types.ts LangCode. */
-const LANGS = ["hi", "ta", "te", "ml", "kn"];
+const LANGS = ["hi", "ta", "te", "ml", "kn", "en"];
 /**
  * TMDB answers on two hostnames. Several Indian ISPs block api.themoviedb.org
  * outright while leaving api.tmdb.org and the image CDN reachable, so probe the
@@ -102,7 +102,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /* ------------------------------------------------------------------ */
 
 /** CBFC certificate, normalised to the three the game uses. */
+const US_RATING = { G: "G", PG: "PG", "PG-13": "PG13", R: "R", "NC-17": "NC17" };
+
 function certOf(detail) {
+  // English films use the US scale; see expand-library.mjs for why.
+  if (detail.original_language === "en") {
+    const us = detail.release_dates?.results?.find((r) => r.iso_3166_1 === "US");
+    for (const d of us?.release_dates ?? []) {
+      const code = US_RATING[(d.certification ?? "").trim().toUpperCase()];
+      if (code) return code;
+    }
+    return "NR";
+  }
   const india = detail.release_dates?.results?.find((r) => r.iso_3166_1 === "IN");
   const raw = india?.release_dates?.map((d) => d.certification).find(Boolean) ?? "";
   const c = raw.toUpperCase().replace(/\s+/g, "");

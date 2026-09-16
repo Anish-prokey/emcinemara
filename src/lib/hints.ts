@@ -130,6 +130,36 @@ const KEEP = new Set([
   "love", "story", "film", "movie", "young", "family", "world", "home",
 ]);
 
+/**
+ * Words that turn up in TMDB character credits without being anyone's name.
+ *
+ * Characters are captured word by word from credits, and a credit is often a
+ * description rather than a name: Sita Ramam credits "Pakistani General
+ * Mohammed Musa Khan", so "Pakistani" was blacked out of its synopsis as if it
+ * were a character, in a story where it is just a nationality. Ranks, jobs,
+ * institutions and nationalities are dropped from the character list here;
+ * the same words are still hidden if they appear in the title or the credits
+ * proper, so a film actually called Major loses nothing.
+ */
+export const NOT_A_NAME = new Set([
+  "pakistani", "indian", "british", "english", "american", "chinese", "african",
+  "lankan", "bangladeshi", "nepali", "afghan", "arab", "muslim", "hindu", "christian",
+  "major", "general", "brigadier", "lieutenant", "colonel", "captain", "commander",
+  "sergeant", "soldier", "officer", "inspector", "constable", "commissioner",
+  "superintendent", "acp", "dcp", "dsp", "ips", "ias", "cbi", "ncb", "police", "army",
+  "minister", "chief", "deputy", "mla", "president", "governor", "collector", "judge",
+  "advocate", "lawyer", "doctor", "nurse", "professor", "principal", "teacher",
+  "college", "school", "student", "manager", "owner", "driver", "servant", "maid",
+  "king", "queen", "emperor", "landlord", "priest", "master", "sir", "madam",
+  // Hollywood credits describe as often as they name: Shrek credits "Princess"
+  // and "Ogre", and hiding those leaves a synopsis that cannot say what kind of
+  // character it is about. Real names built from such words (Spider-Man, Captain
+  // America) are left alone: "spider" and "america" are not on this list.
+  "prince", "princess", "agent", "detective", "sheriff", "mayor", "senator",
+  "ogre", "dragon", "robot", "alien", "monster", "wizard", "witch", "vampire",
+  "zombie", "ghost", "giant", "dwarf", "elf", "orc", "troll",
+]);
+
 /** Every word that would hand the answer over: title, cast and crew names. */
 function secretWords(m: Movie): Set<string> {
   const out = new Set<string>();
@@ -149,13 +179,58 @@ function secretWords(m: Movie): Set<string> {
   m.cast.forEach(add);
   // Character names give the film away just as fast as the title: a synopsis
   // naming Bhavani and Vikram is a search away from the answer.
-  m.characters?.forEach(add);
+  m.characters?.filter((c) => !NOT_A_NAME.has(c.toLowerCase())).forEach(add);
   // Many synopses open in encyclopaedia voice - "X is a 2020 Kannada-language
   // film directed by..." - which hands over the release year. The board charges
   // guesses for that clue, so the hint must not give it away for free.
   out.add(String(m.year));
   return out;
 }
+
+/**
+ * A spelling-insensitive form of a name, for matching only.
+ *
+ * Indian names reach English in several spellings, and TMDB synopses often use a
+ * different one from the title or the credits — sometimes in the same sentence:
+ * "Chaarulatha (also spelled as Charulatha) is a 2012 Indian horror film".
+ * Exact matching blacked out the first and left the second standing, and
+ * measured over the answer pool, 24 synopses leaked a name that way.
+ *
+ * So both sides are folded onto a key that forgets the usual romanisation
+ * choices: doubled letters (aa, dd), the aspirates (th/t, dh/d, bh/b and the
+ * rest), t/d (katha, kadha), sh/s, w/v, z/j, and an optional final "a"
+ * (Siddhartha, Siddharth).
+ *
+ * It deliberately does not match on edit distance. "One letter different"
+ * caught three more real variants but also blacked out "loves" (Lokesh), "hates"
+ * (Ratheesh) and "changes" (Changer). The one looser rule kept is below.
+ */
+export function spellingKey(word: string): string {
+  let s = word.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  s = s.replace(/([bdgkpt])h/g, "$1");
+  s = s.replace(/d/g, "t");
+  s = s.replace(/sh/g, "s").replace(/w/g, "v").replace(/z/g, "j");
+  s = s.replace(/ee/g, "i").replace(/oo/g, "u");
+  s = s.replace(/(.)\1+/g, "$1");
+  if (s.length >= 5) s = s.replace(/a$/, "");
+  return s;
+}
+
+/**
+ * One interior vowel apart, and only in long names: Kasargodu and Kasaragodu.
+ * Final vowels are excluded so a name like "Pakistani" does not swallow the
+ * ordinary word "Pakistan", and short names are excluded outright.
+ */
+function oneVowelApart(a: string, b: string): boolean {
+  const [long, short] = a.length > b.length ? [a, b] : [b, a];
+  if (long.length !== short.length + 1 || short.length < 7) return false;
+  for (let i = 1; i < long.length - 1; i++) {
+    if ("aeiou".includes(long[i]) && long.slice(0, i) + long.slice(i + 1) === short) return true;
+  }
+  return false;
+}
+
+const LETTERS = /^\p{L}+$/u;
 
 export type PlotPiece = { text: string; hidden: boolean };
 
@@ -166,11 +241,34 @@ export type PlotPiece = { text: string; hidden: boolean };
  * — a redaction the player can see is part of the hint, because the shape of
  * what is missing is itself information.
  *
- * Character names cannot be redacted: TMDB does not say who they are. That is a
- * known hole, and it is why this hint sits behind the frame rather than first.
+ * Names are matched on spelling as well as on letters (see spellingKey), because
+ * a synopsis often spells a name differently from the title or the credits.
  */
-export function redactPlot(overview: string, answer: Movie, maxChars = 320): PlotPiece[] {
+// 320 used to be the limit, which cut 94 of the 749 answer-pool synopses and
+// sometimes kept only a prologue: Sita Ramam's stopped after two sentences
+// about Afreen and never reached Ram and Sita. 520 shows all but the longest,
+// encyclopaedia-style ones in full.
+export function redactPlot(overview: string, answer: Movie, maxChars = 520): PlotPiece[] {
   const secrets = secretWords(answer);
+
+  const keys = new Set<string>();
+  const longKeys: string[] = [];
+  for (const w of secrets) {
+    if (w.length < 4 || !LETTERS.test(w)) continue;
+    const k = spellingKey(w);
+    keys.add(k);
+    if (k.length >= 7) longKeys.push(k);
+  }
+
+  const isSecret = (token: string): boolean => {
+    if (secrets.has(token.toLowerCase())) return true;
+    // Spelling-insensitive matching only for real words of five letters and
+    // up. Below that, ordinary words start colliding with names: at four, the
+    // t/d fold read "amid" as the composer Amit Trivedi and blacked it out.
+    if (token.length < 5 || !LETTERS.test(token)) return false;
+    const k = spellingKey(token);
+    return keys.has(k) || longKeys.some((s) => oneVowelApart(k, s));
+  };
 
   let text = overview.trim();
   if (text.length > maxChars) {
@@ -184,7 +282,7 @@ export function redactPlot(overview: string, answer: Movie, maxChars = 320): Plo
   // Split keeping the separators, so punctuation and spacing survive intact.
   for (const token of text.split(/([^\p{L}\p{N}]+)/u)) {
     if (!token) continue;
-    const hidden = secrets.has(token.toLowerCase());
+    const hidden = isSecret(token);
     pieces.push({ text: hidden ? BLOCK.repeat(token.length) : token, hidden });
   }
   return pieces;

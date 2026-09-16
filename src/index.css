@@ -29,6 +29,18 @@
 
 html, body, #root { height: 100%; }
 
+/*
+ * Safe areas. Targeting a recent Android SDK makes the app draw edge to edge on
+ * Android 15 and later, underneath the status and navigation bars. Capacitor's
+ * SystemBars plugin reports those bars' sizes as --safe-area-inset-* on <html>;
+ * in a browser the standard env() values stand in, and they are zero on almost
+ * every screen, so the website does not move.
+ */
+:root {
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

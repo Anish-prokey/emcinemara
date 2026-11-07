@@ -381,30 +381,47 @@ function byTitle(t: string) {
 /* ---- hints: when they unlock ---- */
 {
   const lang = PLAYABLE[0] as LangCode;
-  const withFrame = ALL_MOVIES.find((m) => m.lang === lang && m.backdrop && m.overview)!;
-  const noFrame = ALL_MOVIES.find((m) => m.lang === lang && !m.backdrop && m.overview);
+  // The order now depends on whether a film has a usable plot at all, so the
+  // fixture has to satisfy the same test hintView applies — an overview that
+  // would leak the title is not a plot hint, and a film carrying one would make
+  // these assertions measure the wrong branch.
+  const usablePlot = (m: typeof ALL_MOVIES[number]) =>
+    Boolean(m.overview && m.overview.length >= 40 && !plotWouldLeak(m.overview, m));
+  const withFrame = ALL_MOVIES.find(
+    (m) => m.lang === lang && m.backdrop && usablePlot(m),
+  )!;
+  // A film the poster can serve but the plot cannot: the poster has to move up
+  // into the early slot for it.
+  const noPlot = ALL_MOVIES.find(
+    (m) => m.lang === lang && (m.poster || m.backdrop) && !usablePlot(m),
+  );
 
   const board = (used: number, hints?: GameState["hints"]): GameState => ({
     day: "2026-01-01", lang, status: "playing",
     guesses: Array.from({ length: used }, (_, i) => i + 1), hints,
   });
 
-  check("no frame before the gate", hintView(board(FRAME_AT - 1), withFrame).frameOffered === false);
-  check("a frame is offered on the gate", hintView(board(FRAME_AT), withFrame).frameOffered === true);
-  check("the wait is counted down", hintView(board(FRAME_AT - 2), withFrame).untilNext === 2);
-  check("no plot until its own gate",
-    hintView(board(PLOT_AT - 1, { frameAt: FRAME_AT }), withFrame).plotOffered === false);
-  check("the plot follows the frame",
-    hintView(board(PLOT_AT, { frameAt: FRAME_AT }), withFrame).plotOffered === true);
+  check("the plot is the first hint offered", PLOT_AT < FRAME_AT);
+  check("no plot before the gate", hintView(board(PLOT_AT - 1), withFrame).plotOffered === false);
+  check("a plot is offered on the gate", hintView(board(PLOT_AT), withFrame).plotOffered === true);
+  check("the poster is not offered on the plot's gate",
+    hintView(board(PLOT_AT), withFrame).frameOffered === false);
+  check("the wait is counted down", hintView(board(PLOT_AT - 2), withFrame).untilNext === 2);
+  check("no poster until its own gate",
+    hintView(board(FRAME_AT - 1, { plotAt: PLOT_AT }), withFrame).frameOffered === false);
+  check("the poster follows the plot",
+    hintView(board(FRAME_AT, { plotAt: PLOT_AT }), withFrame).frameOffered === true);
+  check("the wait for the second hint is counted down",
+    hintView(board(FRAME_AT - 2, { plotAt: PLOT_AT }), withFrame).untilNext === 2);
   check("a taken hint stops being offered",
-    hintView(board(FRAME_AT + 1, { frameAt: FRAME_AT }), withFrame).frameOffered === false);
+    hintView(board(PLOT_AT + 1, { plotAt: PLOT_AT }), withFrame).plotOffered === false);
   check("a finished board offers nothing", (() => {
     const g = { ...board(FRAME_AT + 2), status: "won" as const };
     const v = hintView(g, withFrame);
     return !v.frameOffered && !v.plotOffered;
   })());
 
-  // The still sharpens with the guesses that follow it, then stops.
+  // The poster sharpens with the guesses that follow it, then stops.
   const sharp = (used: number) => hintView(board(used, { frameAt: FRAME_AT }), withFrame).sharpness;
   check("the frame starts at its coarsest", sharp(FRAME_AT) === 0);
   check("the frame sharpens as guesses pass", sharp(FRAME_AT + 2) === 2);
@@ -431,13 +448,15 @@ function byTitle(t: string) {
   check("taken late, it still sharpens at least once",
     hintView(board(MAX_GUESSES, { frameAt: MAX_GUESSES - 1 }), withFrame).sharpness >= 1);
 
-  if (noFrame) {
-    check("a film with no still offers its plot early",
-      hintView(board(FRAME_AT), noFrame).plotOffered === true);
+  if (noPlot) {
+    check("a film with no usable plot offers its poster early",
+      hintView(board(PLOT_AT), noPlot).frameOffered === true);
+  } else {
+    console.log("  --    no film without a usable plot to test the early poster on");
   }
 
   check("an untouched board reports no hints", usedAnyHint(board(3)) === false);
-  check("a hinted board says so", usedAnyHint(board(5, { frameAt: 4 })) === true);
+  check("a hinted board says so", usedAnyHint(board(5, { plotAt: 4 })) === true);
   check("a board saved before hints existed still loads",
     hintView({ day: "2026-01-01", lang, guesses: [], status: "playing" }, withFrame).frameTaken === false);
 }
@@ -564,6 +583,64 @@ function byTitle(t: string) {
   }
   check("no offered synopsis shows a title word under another spelling",
     leaked.size === 0, [...leaked].slice(0, 5).join(", "));
+}
+
+/* ---- Baahubali, 6 Nov 2026: the hero's name printed in the plot clue ----
+
+   Two faults, in two different places.
+
+   TMDB credits the hero as "Mahendra 'Sivudu' Bāhubali" and its own synopsis
+   calls him Shivudu. The build script that decides which character names are
+   worth storing matched them exactly, so it concluded the name never appeared
+   and dropped it - while the app's matcher, which folds sh -> s, would have
+   caught it had the name ever reached it. A filter stricter than its consumer
+   throws away precisely the cases the consumer exists for, so both now run the
+   same code: src/lib/spelling.js.
+
+   And the same synopsis misspells him "Shividu" two sentences later, which is
+   not a romanisation variant but a typo, and survived the fold. */
+{
+  const bahubali = ALL_MOVIES.find((m) => m.id === 256040);
+  check("Sivudu and Shivudu fold to one key",
+    spellingKey("Sivudu") === spellingKey("Shivudu"),
+    `${spellingKey("Sivudu")} vs ${spellingKey("Shivudu")}`);
+
+  if (bahubali) {
+    check("the credited spelling of the hero is stored",
+      (bahubali.characters ?? []).some((c) => /^sivudu$/i.test(c)),
+      JSON.stringify(bahubali.characters));
+
+    const shown = bahubali.overview
+      ? redactPlot(bahubali.overview, bahubali).filter((p) => !p.hidden).map((p) => p.text).join("")
+      : "";
+    check("the plot clue no longer names Shivudu", !/shivudu/i.test(shown), shown.slice(0, 80));
+    check("nor the typo two sentences later", !/shividu/i.test(shown), shown.slice(0, 80));
+  } else {
+    console.log("  --    Baahubali is no longer in the library");
+  }
+
+  /*
+   * The invariant behind both faults: a character name the data knows about
+   * must never be readable in the clue. This is the check that would have
+   * caught the original report, and it is deliberately stated over every
+   * synopsis the game can actually offer rather than over the one film.
+   */
+  const showing = new Set<string>();
+  for (const lang of PLAYABLE) {
+    for (let i = 0; i < poolSize(lang); i++) {
+      const m = answerFor(lang, keyForDayIndex(i));
+      if (!m.overview || !m.characters?.length || plotWouldLeak(m.overview, m)) continue;
+      const visible = redactPlot(m.overview, m).filter((p) => !p.hidden).map((p) => p.text).join(" ");
+      const words = new Set(visible.toLowerCase().split(/[^\p{L}\p{N}]+/u));
+      for (const c of m.characters) {
+        // Role words are not names and are meant to stay readable.
+        if (c.length < 4 || NOT_A_NAME.has(c.toLowerCase())) continue;
+        if (words.has(c.toLowerCase())) showing.add(`${lang}:${m.title} shows "${c}"`);
+      }
+    }
+  }
+  check("no offered synopsis shows a character name it knows about",
+    showing.size === 0, [...showing].slice(0, 5).join(", "));
 }
 
 /* ---- Sita Ramam, 14 Sept 2026: two faults in one clue ----

@@ -6,6 +6,9 @@
     "module": "esnext",
     "types": ["vite/client"],
     "resolveJsonModule": true,
+    // src/lib/spelling.js is plain JS so the Node build scripts can import the
+    // very same file the app uses. See the comment at the top of it.
+    "allowJs": true,
     "allowArbitraryExtensions": true,
     "skipLibCheck": true,
 

@@ -13,6 +13,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+// The same file the app redacts with, imported rather than reimplemented.
+import { spellingKey, spellingMatcher } from "../src/lib/spelling.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FILE = resolve(HERE, "../src/data/movies.json");
@@ -102,9 +104,19 @@ const GENERIC_ROLES = new Set([
 
 function charactersInOverview(credits, overview) {
   if (!overview) return undefined;
-  const haystack = new Set(
-    overview.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean),
-  );
+  const words = overview.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const haystack = new Set(words.map((w) => w.toLowerCase()));
+  /*
+   * The app matches names on spelling rather than on letters, so this filter
+   * has to as well, or it throws away the very cases that matcher exists for.
+   *
+   * It did: TMDB credits Baahubali's hero as "Mahendra 'Sivudu' Bāhubali"
+   * while its own synopsis calls him Shivudu. Matching exactly, this decided
+   * the name did not appear and dropped it, so the app never knew to hide it
+   * and the plot hint printed the hero's name. Both spellings fold to the same
+   * key, so with the same matcher on both sides the name is kept and hidden.
+   */
+  const matchesOverview = spellingMatcher(words.filter((w) => w.length >= 5));
 
   const hits = new Set();
   for (const c of (credits?.cast ?? []).slice(0, 20)) {
@@ -114,7 +126,10 @@ function charactersInOverview(credits, overview) {
     for (const token of cleaned.split(/[^\p{L}\p{N}]+/u)) {
       const lower = token.toLowerCase();
       if (token.length < 3 || GENERIC_ROLES.has(lower)) continue;
-      if (haystack.has(lower)) hits.add(token);
+      // Five letters is the app's own floor for spelling-insensitive matching;
+      // below it, ordinary words start colliding with names.
+      const spelled = token.length >= 5 && matchesOverview(spellingKey(token));
+      if (haystack.has(lower) || spelled) hits.add(token);
     }
   }
   return hits.size ? [...hits] : undefined;
@@ -125,8 +140,26 @@ const films = data.movies;
 // `npm run enrich:tmdb -- --lang=en` refreshes one industry instead of
 // refetching every film in the library. The prune below still covers all.
 const langArg = process.argv.find((a) => a.startsWith("--lang="))?.slice(7);
-const targets = langArg ? films.filter((m) => m.lang === langArg) : films;
-console.log(`enriching ${targets.length} films${langArg ? ` (${langArg} only)` : ""}\n`);
+/*
+ * `--characters-only` recomputes nothing but the character lists, against the
+ * synopsis already stored rather than whatever TMDB serves today.
+ *
+ * It exists so a fix to the name matcher can be applied to the data without a
+ * full re-enrich: refetching every synopsis to repair one derived field would
+ * churn 2,000 records and silently adopt whatever TMDB has rewritten since,
+ * for no benefit. In this mode only films that already carry a synopsis are
+ * fetched, since they are the only ones a plot hint can ever be shown for.
+ */
+const CHARS_ONLY = process.argv.includes("--characters-only");
+let targets = langArg ? films.filter((m) => m.lang === langArg) : films;
+if (CHARS_ONLY) targets = targets.filter((m) => m.overview);
+console.log(
+  `${CHARS_ONLY ? "recomputing characters for" : "enriching"} ${targets.length} films` +
+    `${langArg ? ` (${langArg} only)` : ""}\n`,
+);
+
+let charsAdded = 0;
+const charExamples = [];
 
 let withStill = 0;
 let withPlot = 0;
@@ -142,12 +175,33 @@ for (let i = 0; i < targets.length; i += 12) {
       failed++;
       return;
     }
-    m.backdrop = d.backdrop_path ?? null;
-    const ov = (d.overview ?? "").trim();
-    if (ov) m.overview = ov;
-    const chars = charactersInOverview(d.credits, ov);
-    if (chars) m.characters = chars;
+    if (!CHARS_ONLY) {
+      m.backdrop = d.backdrop_path ?? null;
+      const ov = (d.overview ?? "").trim();
+      if (ov) m.overview = ov;
+    }
+    // Always against the synopsis that will actually be redacted.
+    const before = new Set(m.characters ?? []);
+    const found = charactersInOverview(d.credits, m.overview ?? "") ?? [];
+    /*
+     * A union, not a replacement. TMDB rewrites its own credits: it used to
+     * call O Kadhal Kanmani's hero "Aadi", which is the name its synopsis
+     * still uses, and now calls him "Aditya 'Adi' Varadarajan" - so a plain
+     * re-derive dropped a name that is sitting in the first word of the text
+     * we redact. A stale name costs a word of prose at worst; a missing one
+     * prints the answer. Re-filtered through GENERIC_ROLES so that list still
+     * has the final say, and pruneUnreachable keeps it from growing forever.
+     */
+    const merged = [...new Set([...before, ...found])].filter(
+      (c) => !GENERIC_ROLES.has(c.toLowerCase()),
+    );
+    if (merged.length) m.characters = merged;
     else delete m.characters;
+    const gained = merged.filter((c) => !before.has(c));
+    if (gained.length) {
+      charsAdded += gained.length;
+      if (charExamples.length < 25) charExamples.push(`${m.title}: ${gained.join(", ")}`);
+    }
     if (m.backdrop) withStill++;
     if (m.overview) withPlot++;
   });
@@ -162,7 +216,12 @@ data.enrichedAt = new Date().toISOString();
 writeFileSync(FILE, JSON.stringify(data, null, 0));
 
 const pct = (n) => `${Math.round((n / targets.length) * 100)}%`;
-console.log(`\n\nstills   ${withStill}/${targets.length} (${pct(withStill)})`);
-console.log(`plots    ${withPlot}/${targets.length} (${pct(withPlot)})`);
+console.log("");
+if (!CHARS_ONLY) {
+  console.log(`\nstills   ${withStill}/${targets.length} (${pct(withStill)})`);
+  console.log(`plots    ${withPlot}/${targets.length} (${pct(withPlot)})`);
+}
 console.log(`failed   ${failed}`);
-console.log(`pruned   ${stripped} films that can never be the answer`);
+console.log(`names    ${charsAdded} character names newly hidden`);
+for (const e of charExamples) console.log(`           ${e}`);
+if (!CHARS_ONLY) console.log(`pruned   ${stripped} films that can never be the answer`);

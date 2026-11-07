@@ -84,20 +84,21 @@ export function HintBar({
         <div className="min-w-0 flex-1 space-y-2">
           {v.plotTaken && <Plot answer={answer} />}
 
-          {(v.frameOffered || v.plotOffered) && (
+          {/* The plot unlocks first, so it leads here too. */}
+          {(v.plotOffered || v.frameOffered) && (
             <div className="flex flex-wrap gap-2">
-              {v.frameOffered && (
-                <TakeButton
-                  onClick={() => onTake("frame")}
-                  title="Show me the poster"
-                  sub="Heavily pixelated, sharpens each guess"
-                />
-              )}
               {v.plotOffered && (
                 <TakeButton
                   onClick={() => onTake("plot")}
                   title={v.frameTaken ? "Show the plot too" : "Show me the plot"}
                   sub="Synopsis, with the giveaways blacked out"
+                />
+              )}
+              {v.frameOffered && (
+                <TakeButton
+                  onClick={() => onTake("frame")}
+                  title={v.plotTaken ? "Show the poster too" : "Show me the poster"}
+                  sub="Heavily pixelated, sharpens each guess"
                 />
               )}
             </div>

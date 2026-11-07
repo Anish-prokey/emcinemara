@@ -92,7 +92,28 @@ await S("Runtime.enable");
 
 async function goto(url) {
   await S("Page.navigate", { url });
-  await sleep(1400);
+  /*
+   * Wait for React to mount rather than for a fixed 1.4 seconds.
+   *
+   * That sleep was enough against a dev server that had already been browsed,
+   * and not enough against a cold one, where Vite transforms a few hundred
+   * modules on the first request. The run then failed at whichever check
+   * happened to come first - no profile tiles, a missing tile to click, an
+   * "Uncaught" from localStorage on a page that was still about:blank - which
+   * reads like three different bugs and is one race.
+   */
+  for (let i = 0; i < 80; i++) {
+    await sleep(250);
+    try {
+      if (await evaluate(`Boolean(document.querySelector("#root")?.firstElementChild)`)) {
+        await sleep(900); // let the first paint and the opener settle
+        return;
+      }
+    } catch {
+      // No execution context yet: the navigation has not committed.
+    }
+  }
+  throw new Error(`page never mounted: ${url}`);
 }
 
 async function evaluate(expression) {
@@ -361,42 +382,84 @@ async function closeHints() {
   await sleep(350);
 }
 
-const barEarly = await evaluate(
-  `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent || ""))`,
-);
-check("no hint is offered early on", barEarly === false);
+/** Is a hint carrying this label on offer? Matches "Show me the X" and "Show the X too". */
+const offers = (label) =>
+  evaluate(
+    `[...document.querySelectorAll("button")].some(b => (b.textContent || "")
+      .indexOf(${JSON.stringify(label)}) > -1)`,
+  );
 
-// Walk up to the gate.
-const LETTERS_H = "aeiorn".split("");
-for (let i = 0; i < 6; i++) {
-  const used = await evaluate(`(() => {
-    const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
-    return k ? JSON.parse(localStorage.getItem(k)).guesses.length : 0;
+/** Take the hint carrying this label, straight from the board. */
+async function take(label) {
+  await evaluate(`(() => {
+    const b = [...document.querySelectorAll("button")]
+      .find((x) => (x.textContent || "").indexOf(${JSON.stringify(label)}) > -1);
+    if (b) b.click();
+    return Boolean(b);
   })()`);
-  if (used >= 4) break;
-  await guessAnything(LETTERS_H[i]);
-  await sleep(260);
+  await sleep(1400);
+}
+
+const guessesUsed = () => evaluate(`(() => {
+  const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
+  return k ? JSON.parse(localStorage.getItem(k)).guesses.length : 0;
+})()`);
+
+const LETTERS_H = "aeiornslt".split("");
+let letter = 0;
+
+/** Guess until the board has used `n` of them, so a gate can be walked up to. */
+async function walkTo(n) {
+  for (let i = 0; i < 12; i++) {
+    if ((await guessesUsed()) >= n) return;
+    await guessAnything(LETTERS_H[letter++ % LETTERS_H.length]);
+    await sleep(260);
+  }
 }
 
 check(
-  "a hint is offered once the board stops helping",
-  (await evaluate(
-    `[...document.querySelectorAll("button")].some(b => /Show me the poster/.test(b.textContent || ""))`,
-  )) === true,
-);
-check(
-  "the board shows no artwork until asked",
-  (await evaluate(`Boolean(document.querySelector("main canvas"))`)) === false,
+  "no hint is offered early on",
+  (await offers("the plot")) === false && (await offers("the poster")) === false,
 );
 
-// Taken straight from the board, with no dialog in the way.
-await evaluate(`(() => {
-  const b = [...document.querySelectorAll("button")]
-    .find((x) => /Show me the poster/.test(x.textContent || ""));
-  if (b) b.click();
-  return true;
-})()`);
-await sleep(1400);
+// The plot is the first hint: it unlocks at four guesses and the poster at
+// seven. The branch below is not slack in the test - on the rare film with no
+// usable synopsis the poster moves up into the early slot by design, and which
+// film that is depends on the day the test runs.
+await walkTo(4);
+const plotFirst = await offers("the plot");
+check("a hint is offered once the board stops helping", plotFirst || (await offers("the poster")));
+
+if (plotFirst) {
+  check("the poster is held back for later", (await offers("the poster")) === false);
+  check(
+    "the board shows no artwork until asked",
+    (await evaluate(`Boolean(document.querySelector("main canvas"))`)) === false,
+  );
+
+  await take("the plot");
+  const plotted = JSON.parse(await evaluate(`(() => {
+    const k = Object.keys(localStorage).find(x => x.startsWith("emcinemara.v1.game."));
+    const g = k ? JSON.parse(localStorage.getItem(k)) : {};
+    return JSON.stringify({
+      blocks: document.querySelectorAll('main [aria-label="redacted"]').length,
+      saved: g.hints ? g.hints.plotAt : null,
+    });
+  })()`));
+  check("taking the plot prints it on the board, redacted", plotted.blocks > 0, JSON.stringify(plotted));
+  check(
+    "the plot is recorded on the board",
+    plotted.saved !== null && plotted.saved !== undefined,
+    JSON.stringify(plotted),
+  );
+
+  await walkTo(7);
+  check("the poster follows the plot", (await offers("the poster")) === true);
+} else {
+  console.log("  --    today's film has no plot hint, so the poster came early");
+}
+
+await take("the poster");
 
 const STEP_RE = 'new RegExp("Poster [0-9]+" + String.fromCharCode(47) + "[0-9]+")';
 const framed = JSON.parse(await evaluate(`(() => {

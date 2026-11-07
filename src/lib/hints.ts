@@ -1,5 +1,10 @@
 import type { Movie, GameState } from "./types";
 import { MAX_GUESSES } from "./puzzle";
+// Plain JS, shared verbatim with the Node build scripts that decide which
+// character names are worth storing. See the note at the top of that file.
+import { spellingKey, spellingMatcher } from "./spelling.js";
+
+export { spellingKey };
 
 /**
  * Hints, for when the metadata runs out.
@@ -11,9 +16,21 @@ import { MAX_GUESSES } from "./puzzle";
  * anyone — they are taken, and taking one is recorded on the result.
  */
 
-/** Guesses that must be used before each hint can be taken. */
-export const FRAME_AT = 4;
-export const PLOT_AT = 7;
+/**
+ * Guesses that must be used before each hint can be taken.
+ *
+ * The plot goes first. It is the hint that actually unsticks someone: it says
+ * what kind of story this is, which the board never does, and it is the same
+ * text whenever it arrives, so holding it back only delays its whole value.
+ *
+ * The poster is held back instead, because it is the hint that improves by
+ * itself — it sharpens with every guess after it is taken, so arriving later
+ * costs it nothing but steps, and the scale below resizes itself to whatever is
+ * left of the board. Four steps instead of seven, each a bigger jump, still
+ * reaching its clearest on the final guess.
+ */
+export const PLOT_AT = 4;
+export const FRAME_AT = 7;
 
 /**
  * The floor is set by the same complaint that moved it last time: an opening
@@ -44,7 +61,9 @@ const FINEST = 34;
  * while the backdrop is a smear.
  *
  * The scale still has one step for the guess that unlocks it and one for every
- * guess after, so it is improving right up to the last one.
+ * guess after, so it is improving right up to the last one. Its length is
+ * derived from FRAME_AT rather than fixed, so moving the unlock moves the step
+ * count with it and the poster always arrives at its clearest on guess ten.
  */
 export const SHARPNESS: readonly number[] = (() => {
   const steps = Math.max(2, MAX_GUESSES - FRAME_AT + 1);
@@ -79,17 +98,21 @@ export function hintView(game: GameState, answer: Movie): HintView {
   const frameTaken = h.frameAt !== undefined;
   const plotTaken = h.plotAt !== undefined;
 
-  // The poster is the hint; a backdrop only stands in on the rare film that has
-  // no poster. A film with neither simply never offers that hint, and the plot
-  // steps forward rather than leaving the player with nothing.
+  // The poster is the image hint; a backdrop only stands in on the rare film
+  // that has no poster. A film with neither simply never offers it.
   const hasFrame = Boolean(answer.poster || answer.backdrop);
   const hasPlot =
     Boolean(answer.overview && answer.overview.length >= 40) &&
     !plotWouldLeak(answer.overview!, answer);
 
-  const frameOffered = !over && hasFrame && !frameTaken && used >= FRAME_AT;
-  const plotOffered =
-    !over && hasPlot && !plotTaken && used >= (hasFrame ? PLOT_AT : FRAME_AT);
+  const plotOffered = !over && hasPlot && !plotTaken && used >= PLOT_AT;
+  // The poster waits its turn only when there is a plot to take first. On a
+  // film with no usable synopsis it moves up into the early slot rather than
+  // leaving the player with nothing at guess four; it then runs out of steps
+  // around guess seven and simply stays at its clearest, which is a better
+  // trade than three guesses of silence.
+  const frameOffered =
+    !over && hasFrame && !frameTaken && used >= (hasPlot ? FRAME_AT : PLOT_AT);
 
   const sharpness = frameTaken
     ? Math.min(SHARPNESS.length - 1, Math.max(0, used - h.frameAt!))
@@ -97,9 +120,9 @@ export function hintView(game: GameState, answer: Movie): HintView {
 
   let untilNext: number | null = null;
   if (!over) {
-    if (hasFrame && !frameTaken && used < FRAME_AT) untilNext = FRAME_AT - used;
-    else if (hasPlot && !plotTaken && !plotOffered) {
-      const at = hasFrame ? PLOT_AT : FRAME_AT;
+    if (hasPlot && !plotTaken && used < PLOT_AT) untilNext = PLOT_AT - used;
+    else if (hasFrame && !frameTaken && !frameOffered) {
+      const at = hasPlot ? FRAME_AT : PLOT_AT;
       if (used < at) untilNext = at - used;
     }
   }
@@ -151,6 +174,12 @@ export const NOT_A_NAME = new Set([
   "advocate", "lawyer", "doctor", "nurse", "professor", "principal", "teacher",
   "college", "school", "student", "manager", "owner", "driver", "servant", "maid",
   "king", "queen", "emperor", "landlord", "priest", "master", "sir", "madam",
+  "juvenile", "gangster", "convict", "prisoner", "widow", "orphan",
+  // Each of these is stored as a "character" on at least one film in the
+  // library, and each is a role rather than a name. Baahubali's clue read
+  // "he meets the beautiful ███████ princess", hiding the one word that said
+  // what kind of story it was.
+  "warrior", "villager", "rebel", "pilot", "scientist", "warden",
   // Hollywood credits describe as often as they name: Shrek credits "Princess"
   // and "Ogre", and hiding those leaves a synopsis that cannot say what kind of
   // character it is about. Real names built from such words (Spider-Man, Captain
@@ -187,49 +216,6 @@ function secretWords(m: Movie): Set<string> {
   return out;
 }
 
-/**
- * A spelling-insensitive form of a name, for matching only.
- *
- * Indian names reach English in several spellings, and TMDB synopses often use a
- * different one from the title or the credits — sometimes in the same sentence:
- * "Chaarulatha (also spelled as Charulatha) is a 2012 Indian horror film".
- * Exact matching blacked out the first and left the second standing, and
- * measured over the answer pool, 24 synopses leaked a name that way.
- *
- * So both sides are folded onto a key that forgets the usual romanisation
- * choices: doubled letters (aa, dd), the aspirates (th/t, dh/d, bh/b and the
- * rest), t/d (katha, kadha), sh/s, w/v, z/j, and an optional final "a"
- * (Siddhartha, Siddharth).
- *
- * It deliberately does not match on edit distance. "One letter different"
- * caught three more real variants but also blacked out "loves" (Lokesh), "hates"
- * (Ratheesh) and "changes" (Changer). The one looser rule kept is below.
- */
-export function spellingKey(word: string): string {
-  let s = word.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-  s = s.replace(/([bdgkpt])h/g, "$1");
-  s = s.replace(/d/g, "t");
-  s = s.replace(/sh/g, "s").replace(/w/g, "v").replace(/z/g, "j");
-  s = s.replace(/ee/g, "i").replace(/oo/g, "u");
-  s = s.replace(/(.)\1+/g, "$1");
-  if (s.length >= 5) s = s.replace(/a$/, "");
-  return s;
-}
-
-/**
- * One interior vowel apart, and only in long names: Kasargodu and Kasaragodu.
- * Final vowels are excluded so a name like "Pakistani" does not swallow the
- * ordinary word "Pakistan", and short names are excluded outright.
- */
-function oneVowelApart(a: string, b: string): boolean {
-  const [long, short] = a.length > b.length ? [a, b] : [b, a];
-  if (long.length !== short.length + 1 || short.length < 7) return false;
-  for (let i = 1; i < long.length - 1; i++) {
-    if ("aeiou".includes(long[i]) && long.slice(0, i) + long.slice(i + 1) === short) return true;
-  }
-  return false;
-}
-
 const LETTERS = /^\p{L}+$/u;
 
 export type PlotPiece = { text: string; hidden: boolean };
@@ -251,14 +237,7 @@ export type PlotPiece = { text: string; hidden: boolean };
 export function redactPlot(overview: string, answer: Movie, maxChars = 520): PlotPiece[] {
   const secrets = secretWords(answer);
 
-  const keys = new Set<string>();
-  const longKeys: string[] = [];
-  for (const w of secrets) {
-    if (w.length < 4 || !LETTERS.test(w)) continue;
-    const k = spellingKey(w);
-    keys.add(k);
-    if (k.length >= 7) longKeys.push(k);
-  }
+  const matches = spellingMatcher([...secrets].filter((w) => LETTERS.test(w)));
 
   const isSecret = (token: string): boolean => {
     if (secrets.has(token.toLowerCase())) return true;
@@ -266,8 +245,7 @@ export function redactPlot(overview: string, answer: Movie, maxChars = 520): Plo
     // up. Below that, ordinary words start colliding with names: at four, the
     // t/d fold read "amid" as the composer Amit Trivedi and blacked it out.
     if (token.length < 5 || !LETTERS.test(token)) return false;
-    const k = spellingKey(token);
-    return keys.has(k) || longKeys.some((s) => oneVowelApart(k, s));
+    return matches(spellingKey(token));
   };
 
   let text = overview.trim();

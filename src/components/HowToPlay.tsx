@@ -2,7 +2,7 @@ import type { LangCode } from "../lib/types";
 import { MAX_GUESSES } from "../lib/puzzle";
 import { LANGS, certClue } from "../lib/lang";
 import { DATA_SOURCE } from "../data/movies";
-import { FRAME_AT } from "../lib/hints";
+import { FRAME_AT, PLOT_AT } from "../lib/hints";
 
 function Swatch({ cls, children }: { cls: string; children: string }) {
   return (
@@ -58,9 +58,10 @@ export default function HowToPlay({ lang }: { lang: LangCode }) {
       <div className="space-y-2">
         <h3 className="display text-lg text-[var(--color-fg)]">If you get stuck</h3>
         <p>
-          After <strong>{FRAME_AT} guesses</strong> you can ask for a still from the film. It
-          arrives heavily pixelated and sharpens with every guess you make after that. Three guesses later you can also ask for the plot, with the title, cast and crew
-          blacked out.
+          After <strong>{PLOT_AT} guesses</strong> you can ask for the plot, with the title, cast,
+          crew and character names blacked out. After <strong>{FRAME_AT}</strong> you can also ask
+          for the film's poster: it arrives heavily pixelated and sharpens with every guess you
+          make after that, never quite far enough to read the title off it.
         </p>
         <p className="text-[var(--color-muted)]">
           Neither is forced on you and neither costs a guess — but a result solved with help says
